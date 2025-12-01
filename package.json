@@ -1,0 +1,43 @@
+{
+  "name": "saveweb2zip-com-audiotrainerv1-netlify-app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^6.1.0",
+    "@supabase/supabase-js": "^2.86.0",
+    "antd": "^6.0.0",
+    "lucide-react": "^0.555.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-h5-audio-player": "^3.10.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "wavesurfer.js": "^7.11.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "@vitest/ui": "^4.0.14",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "happy-dom": "^20.0.11",
+    "vite": "^6.0.0",
+    "vitest": "^4.0.14"
+  }
+}
