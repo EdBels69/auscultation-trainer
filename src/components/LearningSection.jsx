@@ -1,12 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Row, Col, Typography, Empty, Drawer, Button, Tag, Spin } from 'antd';
 import { MenuOutlined } from '@ant-design/icons';
 import SoundCard from './SoundCard';
 import TopicTree from './TopicTree';
 import { getLearningNodes } from '../services/api';
 import { buildLearningTree } from '../utils/structureUtils';
-import AudioPlayer from 'react-h5-audio-player';
-import 'react-h5-audio-player/lib/styles.css';
+import AudioPlayer from './AudioPlayer';
 
 const { Title, Text } = Typography;
 
@@ -52,68 +51,74 @@ function LearningSection({ audioRecords }) {
     // Get items (sub-filters) for the current category
     const subFilters = currentCategory?.items || [];
 
-    // Filter audio records based on selected system and subfilter
-    const filteredRecords = audioRecords.filter(r => {
-        // Only show complete records (with audio, image, and description)
-        const hasAudio = r.audioUrl && r.audioUrl !== '';
-        const hasImage = r.imageUrl && r.imageUrl !== '';
-        const hasDescription = r.description && r.description.trim() !== '';
-        if (!hasAudio || !hasImage || !hasDescription) return false;
+    // Filter audio records based on selected system and subfilter (memoized)
+    const filteredRecords = useMemo(() => {
+        return audioRecords.filter(r => {
+            // Only show complete records (with audio, image, and description)
+            const hasAudio = r.audioUrl && r.audioUrl !== '';
+            const hasImage = r.imageUrl && r.imageUrl !== '';
+            const hasDescription = r.description && r.description.trim() !== '';
+            if (!hasAudio || !hasImage || !hasDescription) return false;
 
-        // First: check system (cardiac/pulmonary)
-        let requiredCategory = null;
-        if (selectedSystem === 'cardiology') requiredCategory = 'cardiac';
-        else if (selectedSystem === 'pulmonology') requiredCategory = 'pulmonary';
+            // First: check system (cardiac/pulmonary)
+            let requiredCategory = null;
+            if (selectedSystem === 'cardiology') requiredCategory = 'cardiac';
+            else if (selectedSystem === 'pulmonology') requiredCategory = 'pulmonary';
 
-        if (requiredCategory && r.category !== requiredCategory) return false;
+            if (requiredCategory && r.category !== requiredCategory) return false;
 
-        // If a specific sub-filter (Item level) is selected, filter by linkedNodeKey
-        if (selectedSubFilter) {
-            if (r.linkedNodeKey === selectedSubFilter) return true;
-            // Check subtypes of the selected item
-            const itemConfig = subFilters.find(f => f.key === selectedSubFilter);
-            if (itemConfig && itemConfig.subtypes) {
-                const isSubtypeMatch = itemConfig.subtypes.some(sub =>
-                    typeof sub === 'string' ? false : r.linkedNodeKey === sub.key
-                );
-                if (isSubtypeMatch) return true;
+            // If a specific sub-filter (Item level) is selected, filter by linkedNodeKey
+            if (selectedSubFilter) {
+                if (r.linkedNodeKey === selectedSubFilter) return true;
+                // Check subtypes of the selected item
+                const itemConfig = subFilters.find(f => f.key === selectedSubFilter);
+                if (itemConfig && itemConfig.subtypes) {
+                    const isSubtypeMatch = itemConfig.subtypes.some(sub =>
+                        typeof sub === 'string' ? false : r.linkedNodeKey === sub.key
+                    );
+                    if (isSubtypeMatch) return true;
+                }
+                return false;
             }
-            return false;
-        }
 
-        // Filter by category - check if linkedNodeKey matches category or any of its items/subtypes
-        if (currentCategory) {
-            // Check if linked to the category itself
-            if (r.linkedNodeKey === currentCategory.key) return true;
+            // Filter by category - check if linkedNodeKey matches category or any of its items/subtypes
+            if (currentCategory) {
+                // Check if linked to the category itself
+                if (r.linkedNodeKey === currentCategory.key) return true;
 
-            // Check if linked to any item in the category
-            if (currentCategory.items) {
-                for (const item of currentCategory.items) {
-                    if (r.linkedNodeKey === item.key) return true;
-                    // Check subtypes
-                    if (item.subtypes) {
-                        const isSubtypeMatch = item.subtypes.some(sub =>
-                            typeof sub === 'string' ? false : r.linkedNodeKey === sub.key
-                        );
-                        if (isSubtypeMatch) return true;
+                // Check if linked to any item in the category
+                if (currentCategory.items) {
+                    for (const item of currentCategory.items) {
+                        if (r.linkedNodeKey === item.key) return true;
+                        // Check subtypes
+                        if (item.subtypes) {
+                            const isSubtypeMatch = item.subtypes.some(sub =>
+                                typeof sub === 'string' ? false : r.linkedNodeKey === sub.key
+                            );
+                            if (isSubtypeMatch) return true;
+                        }
                     }
                 }
+                return false;
             }
-            return false;
-        }
 
-        return true;
-    });
+            return true;
+        });
+    }, [audioRecords, selectedSystem, selectedSubFilter, subFilters, currentCategory]);
 
-    // Auto-select first audio
+    // Get first record ID for stable comparison
+    const firstRecordId = filteredRecords.length > 0 ? filteredRecords[0].id : null;
+
+    // Auto-select first audio (only when category/filter changes)
     useEffect(() => {
         if (loading) return;
-        if (filteredRecords.length > 0) {
-            setSelectedAudio(filteredRecords[0]);
-        } else {
-            setSelectedAudio(null);
+
+        // If no selection or selection not in current list, select first
+        if (!selectedAudio || !filteredRecords.find(r => r.id === selectedAudio.id)) {
+            setSelectedAudio(filteredRecords[0] || null);
         }
-    }, [selectedCategory, selectedSystem, loading, filteredRecords.length]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedCategory, selectedSystem, selectedSubFilter, loading, firstRecordId]);
 
     const handleCategorySelect = (categoryKey, systemKey) => {
         setSelectedCategory(categoryKey);
@@ -350,19 +355,7 @@ function LearningSection({ audioRecords }) {
                                 {selectedAudio.audioUrl && (
                                     <div style={{ marginTop: 20 }}>
                                         <AudioPlayer
-                                            src={selectedAudio.audioUrl}
-                                            showJumpControls={false}
-                                            showDownloadProgress={false}
-                                            showFilledProgress={true}
-                                            customAdditionalControls={[]}
-                                            customVolumeControls={['VOLUME']}
-                                            layout="horizontal"
-                                            style={{
-                                                boxShadow: 'none',
-                                                background: '#fff',
-                                                borderRadius: 8,
-                                                border: '1px solid #e3e8ee'
-                                            }}
+                                            audioUrl={selectedAudio.audioUrl}
                                         />
                                     </div>
                                 )}
