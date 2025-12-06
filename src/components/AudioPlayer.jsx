@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
-import { Button } from 'antd';
-import { PlayCircleOutlined, PauseCircleOutlined } from '@ant-design/icons';
+import { Button, Slider } from 'antd';
+import { PlayCircleOutlined, PauseCircleOutlined, SoundOutlined } from '@ant-design/icons';
 import WaveSurfer from 'wavesurfer.js';
 
 function AudioPlayer({ audioUrl }) {
@@ -8,6 +8,7 @@ function AudioPlayer({ audioUrl }) {
   const waveformRef = useRef(null);
   const wavesurfer = useRef(null);
   const [playing, setPlaying] = useState(false);
+  const [volume, setVolume] = useState(80);
 
   useEffect(() => {
     if (!waveformRef.current || !audioUrl) return;
@@ -25,6 +26,10 @@ function AudioPlayer({ audioUrl }) {
 
     wavesurfer.current.load(audioUrl);
 
+    wavesurfer.current.on('ready', () => {
+      wavesurfer.current.setVolume(volume / 100);
+    });
+
     wavesurfer.current.on('click', () => {
       wavesurfer.current.play();
       setPlaying(true);
@@ -38,6 +43,11 @@ function AudioPlayer({ audioUrl }) {
   const togglePlay = () => {
     wavesurfer.current?.playPause();
     setPlaying(p => !p);
+  };
+
+  const handleVolumeChange = (value) => {
+    setVolume(value);
+    wavesurfer.current?.setVolume(value / 100);
   };
 
   if (!audioUrl) return null;
@@ -63,14 +73,28 @@ function AudioPlayer({ audioUrl }) {
         <div ref={waveformRef} />
       </div>
 
-      <Button
-        type="primary"
-        icon={playing ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
-        onClick={togglePlay}
-        style={{ marginTop: 8, background: '#4F4A85', border: 'none' }}
-      >
-        {playing ? 'Пауза' : 'Играть'}
-      </Button>
+      {/* Контролы */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
+        <Button
+          type="primary"
+          icon={playing ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
+          onClick={togglePlay}
+          style={{ background: '#4F4A85', border: 'none' }}
+        >
+          {playing ? 'Пауза' : 'Играть'}
+        </Button>
+
+        {/* Громкость */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: 100 }}>
+          <SoundOutlined style={{ color: '#888', fontSize: 14 }} />
+          <Slider
+            value={volume}
+            onChange={handleVolumeChange}
+            style={{ flex: 1, margin: 0 }}
+            tooltip={{ formatter: (v) => `${v}%` }}
+          />
+        </div>
+      </div>
     </div>
   );
 }
