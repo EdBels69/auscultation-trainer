@@ -322,7 +322,11 @@ function StructureManager({ audioRecords, onAudioUpdate }) {
                     <span>
                         {item.type === 'system' && '🫁/❤️ '}
                         {item.type === 'category' && <FolderOutlined />}
-                        {(item.type === 'item' || item.type === 'subtype') && <FileTextOutlined />}
+                        {(item.type === 'item' || item.type === 'subtype') && (
+                            item.children && item.children.length > 0
+                                ? <FolderOutlined />
+                                : <FileTextOutlined />
+                        )}
                         {' '}
                         <span style={item.is_hidden ? { color: '#ccc', textDecoration: 'line-through' } : {}}>
                             {item.name}
