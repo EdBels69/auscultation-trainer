@@ -1,9 +1,224 @@
-/* Minimal global styles - most styling comes from Ant Design */
+/* Apple San Francisco Font Stack */
+:root {
+  /* Stripe-inspired color palette */
+  --stripe-purple: #635bff;
+  --stripe-purple-light: #7a73ff;
+  --stripe-purple-dark: #0a2540;
+  --stripe-blue: #00d4ff;
+  --stripe-gradient: linear-gradient(135deg, #635bff 0%, #00d4ff 100%);
+  --stripe-gradient-subtle: linear-gradient(135deg, rgba(99, 91, 255, 0.08) 0%, rgba(0, 212, 255, 0.08) 100%);
+
+  /* Neutral colors */
+  --gray-50: #fafbfc;
+  --gray-100: #f6f9fc;
+  --gray-200: #e3e8ee;
+  --gray-300: #c1cbd7;
+  --gray-400: #8792a2;
+  --gray-500: #697386;
+  --gray-900: #0a2540;
+
+  /* Shadows - Stripe style */
+  --shadow-sm: 0 1px 3px rgba(50, 50, 93, 0.05), 0 1px 0 rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 13px 27px -5px rgba(50, 50, 93, 0.25), 0 8px 16px -8px rgba(0, 0, 0, 0.3);
+  --shadow-hover: 0 7px 14px rgba(50, 50, 93, 0.1), 0 3px 6px rgba(0, 0, 0, 0.08);
+
+  /* Border radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1;
+  font-kerning: normal;
+  background: var(--gray-50);
+  color: var(--gray-900);
+  overflow-y: scroll;
+  /* Always show scrollbar to prevent layout shift */
+}
+
+/* Optimize for Retina displays */
+@media (-webkit-min-device-pixel-ratio: 2),
+(min-resolution: 192dpi) {
+  body {
+    -webkit-font-smoothing: subpixel-antialiased;
+  }
+}
+
+/* Smooth transitions for common interactive elements only */
+a,
+button,
+input,
+.ant-btn,
+.ant-card,
+.ant-tag,
+.ant-tabs-tab-btn {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Ant Design Overrides for Stripe Theme */
+.ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--stripe-purple) !important;
+  font-weight: 600;
+}
+
+.ant-tabs-ink-bar {
+  background: var(--stripe-purple) !important;
+}
+
+.ant-btn-primary {
+  background: var(--stripe-purple);
+  border-color: var(--stripe-purple);
+  box-shadow: var(--shadow-sm);
+}
+
+.ant-btn-primary:hover {
+  background: var(--stripe-purple-light) !important;
+  border-color: var(--stripe-purple-light) !important;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-hover);
+}
+
+.ant-typography h1,
+.ant-typography h2,
+.ant-typography h3,
+.ant-typography h4 {
+  color: var(--gray-900) !important;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Stripe-like Menu Styles */
+.stripe-menu .ant-menu-item {
+  height: 32px !important;
+  line-height: 32px !important;
+  margin-bottom: 2px !important;
+  border-radius: 4px !important;
+  color: var(--gray-600) !important;
+  font-size: 13px !important;
+}
+
+.stripe-menu .ant-menu-item:hover {
+  color: var(--gray-900) !important;
+  background: rgba(0, 0, 0, 0.04) !important;
+}
+
+.stripe-menu .ant-menu-item-selected {
+  background: rgba(99, 91, 255, 0.08) !important;
+  color: var(--stripe-purple) !important;
+  font-weight: 500 !important;
+}
+
+.stripe-menu .ant-menu-submenu-title {
+  height: 32px !important;
+  line-height: 32px !important;
+  margin-bottom: 2px !important;
+  border-radius: 4px !important;
+  color: var(--gray-700) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+.stripe-menu .ant-menu-submenu-title:hover {
+  color: var(--gray-900) !important;
+}
+
+.stripe-menu .ant-menu-inline,
+.stripe-menu .ant-menu-vertical {
+  border-right: none !important;
+}
+
+/* React H5 Audio Player Custom Styles */
+.rhap_container {
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 8px 0 !important;
+}
+
+.rhap_main {
+  flex-direction: row !important;
+  gap: 12px;
+}
+
+.rhap_controls-section {
+  flex: 0 0 auto !important;
+  margin: 0 !important;
+}
+
+.rhap_play-pause-button {
+  width: 36px !important;
+  height: 36px !important;
+  font-size: 36px !important;
+  color: #635bff !important;
+}
+
+.rhap_play-pause-button:hover {
+  color: #4b45c7 !important;
+}
+
+.rhap_progress-section {
+  flex: 1 !important;
+  gap: 8px;
+}
+
+.rhap_progress-bar {
+  background: #e3e8ee !important;
+  height: 4px !important;
+  border-radius: 2px !important;
+}
+
+.rhap_progress-filled {
+  background: #635bff !important;
+  border-radius: 2px !important;
+}
+
+.rhap_progress-indicator {
+  width: 12px !important;
+  height: 12px !important;
+  background: #635bff !important;
+  box-shadow: none !important;
+  top: -4px !important;
+}
+
+.rhap_time {
+  font-size: 11px !important;
+  color: #697386 !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+.rhap_volume-bar-area {
+  width: 60px !important;
+}
+
+.rhap_volume-bar {
+  background: #e3e8ee !important;
+  height: 4px !important;
+  border-radius: 2px !important;
+}
+
+.rhap_volume-indicator {
+  width: 10px !important;
+  height: 10px !important;
+  background: #635bff !important;
+  box-shadow: none !important;
+}
+
+.rhap_volume-filled {
+  background: #635bff !important;
+}
+
+.rhap_button-clear {
+  color: #697386 !important;
+}
+
+.rhap_button-clear:hover {
+  color: #635bff !important;
 }

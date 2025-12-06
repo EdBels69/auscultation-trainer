@@ -1,106 +1,97 @@
-import { Card, Typography, Tag } from 'antd';
+import { Typography, Tag } from 'antd';
 import { HeartOutlined, SoundOutlined } from '@ant-design/icons';
 
-const { Text, Paragraph } = Typography;
+const { Text } = Typography;
 
 function SoundCard({ record, isSelected, onClick }) {
+    const styles = {
+        card: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            padding: '14px 16px',
+            border: isSelected ? '1.5px solid #635bff' : '1px solid #e3e8ee',
+            borderRadius: 8,
+            cursor: 'pointer',
+            background: isSelected ? 'rgba(99, 91, 255, 0.04)' : '#fff',
+            transition: 'all 0.15s ease',
+            minHeight: 64
+        },
+        icon: {
+            width: 36,
+            height: 36,
+            borderRadius: 8,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            fontSize: 14
+        },
+        content: {
+            flex: 1,
+            minWidth: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4
+        },
+        title: {
+            fontSize: 14,
+            fontWeight: 500,
+            color: '#0a2540',
+            lineHeight: 1.3,
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden'
+        },
+        tag: {
+            fontSize: 11,
+            padding: '2px 8px',
+            margin: 0,
+            border: '1px solid #e3e8ee',
+            borderRadius: 4,
+            background: '#f7f9fc',
+            color: '#697386',
+            display: 'inline-block',
+            width: 'fit-content'
+        }
+    };
+
+    const iconBg = record.category === 'cardiac'
+        ? 'linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%)'
+        : 'linear-gradient(135deg, #635bff 0%, #00d4ff 100%)';
+
     return (
-        <Card
-            hoverable
+        <div
+            style={styles.card}
             onClick={onClick}
-            style={{
-                height: '100%',
-                minHeight: 200,
-                border: isSelected ? '2px solid #1890ff' : '1px solid #f0f0f0',
-                transition: 'all 0.3s',
-                cursor: 'pointer',
-                background: isSelected ? '#f0f5ff' : '#fff',
-                boxShadow: isSelected
-                    ? '0 4px 12px rgba(24,144,255,0.15)'
-                    : '0 2px 8px rgba(0,0,0,0.06)'
+            onMouseEnter={(e) => {
+                if (!isSelected) {
+                    e.currentTarget.style.borderColor = '#635bff';
+                    e.currentTarget.style.background = 'rgba(99, 91, 255, 0.02)';
+                }
+            }}
+            onMouseLeave={(e) => {
+                if (!isSelected) {
+                    e.currentTarget.style.borderColor = '#e3e8ee';
+                    e.currentTarget.style.background = '#fff';
+                }
             }}
         >
-            {record.image_url && (
-                <div style={{
-                    width: '100%',
-                    height: 120,
-                    borderRadius: 8,
-                    overflow: 'hidden',
-                    marginBottom: 12,
-                    background: '#f5f5f5'
-                }}>
-                    <img
-                        src={record.image_url}
-                        alt={record.name}
-                        style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover'
-                        }}
-                    />
-                </div>
-            )}
-            <div style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 12,
-                marginBottom: 12
-            }}>
-                <div style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: '50%',
-                    background: record.category === 'cardiac' ? '#ffe7e6' : '#e6f4ff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: record.category === 'cardiac' ? '#ff4d4f' : '#1890ff',
-                    fontSize: 18,
-                    flexShrink: 0
-                }}>
-                    {record.category === 'cardiac' ? <HeartOutlined /> : <SoundOutlined />}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                    <Text
-                        strong
-                        style={{
-                            fontSize: 14,
-                            display: 'block',
-                            marginBottom: 6,
-                            lineHeight: 1.4,
-                            wordBreak: 'break-word',
-                            color: '#262626'
-                        }}
-                    >
-                        {record.name}
-                    </Text>
-                    <Tag
-                        style={{
-                            margin: 0,
-                            fontSize: 11,
-                            padding: '2px 8px',
-                            border: 'none',
-                            background: '#f5f5f5',
-                            color: '#595959'
-                        }}
-                    >
-                        {record.position}
-                    </Tag>
-                </div>
+            {/* Icon */}
+            <div style={{ ...styles.icon, background: iconBg }}>
+                {record.category === 'cardiac'
+                    ? <HeartOutlined style={{ color: '#fff' }} />
+                    : <SoundOutlined style={{ color: '#fff' }} />
+                }
             </div>
 
-            <Paragraph
-                ellipsis={{ rows: 2 }}
-                style={{
-                    fontSize: 13,
-                    color: '#8c8c8c',
-                    marginBottom: 0,
-                    lineHeight: 1.6
-                }}
-            >
-                {record.description}
-            </Paragraph>
-        </Card>
+            {/* Content - always in column: title on top, tag below */}
+            <div style={styles.content}>
+                <div style={styles.title}>{record.name}</div>
+                <Tag style={styles.tag}>{record.position}</Tag>
+            </div>
+        </div>
     );
 }
 

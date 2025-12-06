@@ -15,14 +15,29 @@ function Navigation({ currentSection, onSectionChange }) {
     return (
         <Header style={{
             background: '#fff',
-            padding: '0 32px',
-            borderBottom: '1px solid #f0f0f0',
+            padding: '0 40px',
+            borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
             display: 'flex',
             alignItems: 'center',
-            gap: '48px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+            gap: '56px',
+            boxShadow: '0 1px 3px rgba(50, 50, 93, 0.05), 0 1px 0 rgba(0, 0, 0, 0.02)',
+            position: 'sticky',
+            top: 0,
+            zIndex: 100
         }}>
-            <Title level={4} style={{ margin: 0, minWidth: '200px', color: '#1890ff' }}>
+            <Title
+                level={4}
+                style={{
+                    margin: 0,
+                    minWidth: '200px',
+                    background: 'linear-gradient(135deg, #635bff 0%, #00d4ff 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                    fontWeight: 700,
+                    fontSize: '18px'
+                }}
+            >
                 🎧 Аускультация
             </Title>
             <Menu
@@ -33,7 +48,8 @@ function Navigation({ currentSection, onSectionChange }) {
                 style={{
                     flex: 1,
                     border: 'none',
-                    fontSize: 15
+                    fontSize: 14,
+                    fontWeight: 500
                 }}
             />
         </Header>

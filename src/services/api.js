@@ -23,18 +23,29 @@ export async function getSounds() {
             category: item.category,
             position: item.position,
             audioUrl: audioUrl,
-            image_url: item.image_url,
+            filePath: item.file_path, // Needed for update/delete
+            imageUrl: item.image_url,
             fileName: item.file_name,
-            createdAt: item.created_at
+            createdAt: item.created_at,
+            linkedNodeKey: item.linked_node_key
         };
     });
 }
 
 // Add a new sound with audio file and optional image
 export async function addSound(soundData, file, imageFile = null) {
+    // Sanitize filename - remove non-ASCII characters
+    const sanitizeFileName = (name) => {
+        const ext = name.split('.').pop();
+        const baseName = name.replace(/\.[^/.]+$/, '');
+        // Replace non-ASCII with underscores, keep alphanumeric and basic punctuation
+        const clean = baseName.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 50);
+        return `${clean}.${ext}`;
+    };
+
     // 1. Upload audio file to storage
-    const fileName = `${Date.now()}_${file.name}`;
-    const filePath = fileName;
+    const safeFileName = sanitizeFileName(file.name);
+    const filePath = `${Date.now()}_${safeFileName}`;
 
     const { error: uploadError } = await supabase.storage
         .from('sounds')
@@ -42,24 +53,21 @@ export async function addSound(soundData, file, imageFile = null) {
 
     if (uploadError) throw uploadError;
 
-    const { data: { publicUrl: audioUrl } } = supabase.storage
-        .from('sounds')
-        .getPublicUrl(filePath);
-
     // 2. Upload image file if provided
     let imageUrl = null;
     if (imageFile) {
-        const imageName = `${Date.now()}_${imageFile.name}`;
+        const safeImageName = sanitizeFileName(imageFile.name);
+        const imagePath = `${Date.now()}_${safeImageName}`;
         const { error: imageError } = await supabase.storage
             .from('sounds')
-            .upload(imageName, imageFile);
+            .upload(imagePath, imageFile);
 
         if (imageError) {
             console.error('Image upload error:', imageError);
         } else {
             const { data: { publicUrl: imgUrl } } = supabase.storage
                 .from('sounds')
-                .getPublicUrl(imageName);
+                .getPublicUrl(imagePath);
             imageUrl = imgUrl;
         }
     }
@@ -72,9 +80,10 @@ export async function addSound(soundData, file, imageFile = null) {
             description: soundData.description,
             category: soundData.category,
             position: soundData.position,
-            audio_url: audioUrl,
+            file_path: filePath,
             file_name: file.name,
-            image_url: imageUrl
+            image_url: imageUrl,
+            linked_node_key: soundData.linked_node_key
         })
         .select()
         .single();
@@ -82,7 +91,7 @@ export async function addSound(soundData, file, imageFile = null) {
     if (dbError) {
         // Cleanup files if DB insert fails
         await supabase.storage.from('sounds').remove([filePath]);
-        if (imageUrl) {
+        if (imageFile) {
             const imageName = `${Date.now()}_${imageFile.name}`;
             await supabase.storage.from('sounds').remove([imageName]);
         }
@@ -92,7 +101,7 @@ export async function addSound(soundData, file, imageFile = null) {
     return data;
 }
 
-// Update a sound
+// Update a sound (text fields only)
 export async function updateSound(id, updates) {
     const { data, error } = await supabase
         .from('sounds')
@@ -100,7 +109,76 @@ export async function updateSound(id, updates) {
             name: updates.name,
             description: updates.description,
             category: updates.category,
-            position: updates.position
+            position: updates.position,
+            linked_node_key: updates.linked_node_key
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+}
+
+// Update a sound with optional new audio/image files
+export async function updateSoundWithFile(id, updates, audioFile = null, imageFile = null, oldFilePath = null) {
+    // Sanitize filename helper
+    const sanitizeFileName = (name) => {
+        const ext = name.split('.').pop();
+        const baseName = name.replace(/\.[^/.]+$/, '');
+        const clean = baseName.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 50);
+        return `${clean}.${ext}`;
+    };
+
+    let newFilePath = oldFilePath;
+    let newImageUrl = updates.image_url || null;
+
+    // Upload new audio file if provided
+    if (audioFile) {
+        const safeFileName = sanitizeFileName(audioFile.name);
+        newFilePath = `${Date.now()}_${safeFileName}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from('sounds')
+            .upload(newFilePath, audioFile);
+
+        if (uploadError) throw uploadError;
+
+        // Delete old file if exists
+        if (oldFilePath) {
+            await supabase.storage.from('sounds').remove([oldFilePath]);
+        }
+    }
+
+    // Upload new image file if provided
+    if (imageFile) {
+        const safeImageName = sanitizeFileName(imageFile.name);
+        const imagePath = `${Date.now()}_${safeImageName}`;
+
+        const { error: imageError } = await supabase.storage
+            .from('sounds')
+            .upload(imagePath, imageFile);
+
+        if (!imageError) {
+            const { data: { publicUrl } } = supabase.storage
+                .from('sounds')
+                .getPublicUrl(imagePath);
+            newImageUrl = publicUrl;
+        }
+    }
+
+    // Update database record
+    const { data, error } = await supabase
+        .from('sounds')
+        .update({
+            name: updates.name,
+            description: updates.description,
+            category: updates.category,
+            position: updates.position,
+            file_path: newFilePath,
+            file_name: audioFile ? audioFile.name : updates.file_name,
+            image_url: newImageUrl,
+            linked_node_key: updates.linked_node_key
         })
         .eq('id', id)
         .select()
@@ -169,6 +247,50 @@ export async function updateTheoryNode(id, updates) {
 export async function deleteTheoryNode(id) {
     const { error } = await supabase
         .from('theory_nodes')
+        .delete()
+        .eq('id', id);
+
+    if (error) throw error;
+}
+
+// --- Learning Structure API ---
+
+export async function getLearningNodes() {
+    const { data, error } = await supabase
+        .from('learning_nodes')
+        .select('*')
+        .order('order', { ascending: true });
+
+    if (error) throw error;
+    return data;
+}
+
+export async function addLearningNode(nodeData) {
+    const { data, error } = await supabase
+        .from('learning_nodes')
+        .insert(nodeData)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+}
+
+export async function updateLearningNode(id, updates) {
+    const { data, error } = await supabase
+        .from('learning_nodes')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+}
+
+export async function deleteLearningNode(id) {
+    const { error } = await supabase
+        .from('learning_nodes')
         .delete()
         .eq('id', id);
 

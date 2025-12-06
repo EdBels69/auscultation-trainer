@@ -1,14 +1,13 @@
 import { useRef, useEffect, useState } from 'react';
-import { Button, Slider, Space } from 'antd';
+import { Button, Slider } from 'antd';
 import {
   PlayCircleOutlined,
   PauseCircleOutlined,
-  SoundOutlined,
-  StepBackwardOutlined
+  SoundOutlined
 } from '@ant-design/icons';
 import WaveSurfer from 'wavesurfer.js';
 
-function AudioPlayer({ audioUrl, sticky = false, isMobile = false }) {
+function AudioPlayer({ audioUrl }) {
   const waveformRef = useRef(null);
   const wavesurfer = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -20,23 +19,19 @@ function AudioPlayer({ audioUrl, sticky = false, isMobile = false }) {
   useEffect(() => {
     if (!waveformRef.current || !audioUrl) return;
 
-    // Create WaveSurfer instance
     wavesurfer.current = WaveSurfer.create({
       container: waveformRef.current,
-      waveColor: '#d9d9d9',
-      progressColor: '#1890ff',
-      cursorColor: '#ff4d4f',
-      barWidth: 3,
-      barGap: 2,
-      barRadius: 3,
-      height: isMobile ? 60 : 80,
+      waveColor: '#e3e8ee',
+      progressColor: '#635bff',
+      cursorColor: 'transparent',
+      barWidth: 2,
+      barGap: 1,
+      barRadius: 2,
+      height: 28,
       normalize: true,
-      responsive: false,
-      backend: 'WebAudio',
-      minPxPerSec: isMobile ? 100 : 200, // Less zoom on mobile
-      scrollParent: true,
-      autoCenter: true,
-      fillParent: false,
+      fillParent: true,
+      scrollParent: false,
+      minPxPerSec: 1,
     });
 
     wavesurfer.current.load(audioUrl);
@@ -73,14 +68,6 @@ function AudioPlayer({ audioUrl, sticky = false, isMobile = false }) {
     }
   };
 
-  const handleReset = () => {
-    if (wavesurfer.current) {
-      wavesurfer.current.stop();
-      setPlaying(false);
-      setCurrentTime(0);
-    }
-  };
-
   const handleVolumeChange = (value) => {
     setVolume(value);
     if (wavesurfer.current) {
@@ -95,121 +82,70 @@ function AudioPlayer({ audioUrl, sticky = false, isMobile = false }) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  if (!audioUrl) {
-    return null;
-  }
+  if (!audioUrl) return null;
 
-  const playerContent = (
-    <div style={{
-      background: '#fff',
-      padding: '16px 24px',
-      borderRadius: sticky ? 0 : 12,
-      boxShadow: sticky ? '0 -2px 8px rgba(0,0,0,0.1)' : '0 2px 8px rgba(0,0,0,0.06)',
-    }}>
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      {/* Play Button */}
+      <Button
+        type="primary"
+        shape="circle"
+        size="middle"
+        icon={playing ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
+        onClick={togglePlay}
+        disabled={loading}
+        style={{
+          background: '#635bff',
+          border: 'none',
+          boxShadow: 'none',
+          width: 36,
+          height: 36,
+          minWidth: 36
+        }}
+      />
+
       {/* Waveform */}
       <div
+        ref={waveformRef}
         style={{
-          marginBottom: 16,
+          flex: 1,
           opacity: loading ? 0.5 : 1,
-          transition: 'opacity 0.3s',
-          overflow: 'auto',
-          maxWidth: '100%',
+          cursor: 'pointer',
+          minWidth: 100
         }}
-      >
-        <div ref={waveformRef} />
+      />
+
+      {/* Time */}
+      <div style={{
+        fontSize: 11,
+        color: '#697386',
+        fontVariantNumeric: 'tabular-nums',
+        whiteSpace: 'nowrap'
+      }}>
+        {formatTime(currentTime)} / {formatTime(duration)}
       </div>
 
-      {/* Controls */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 16,
-        flexWrap: 'wrap'
-      }}>
-        <Space size="small">
-          <Button
-            type="primary"
-            shape="circle"
-            size="large"
-            icon={playing ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
-            onClick={togglePlay}
-            disabled={loading}
-          />
-          <Button
-            shape="circle"
-            icon={<StepBackwardOutlined />}
-            onClick={handleReset}
-            disabled={loading}
-          />
-        </Space>
-
-        <div style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          minWidth: 200
-        }}>
-          <span style={{ fontSize: 12, color: '#8c8c8c', minWidth: 38 }}>
-            {formatTime(currentTime)}
-          </span>
-          <div style={{
-            flex: 1,
-            height: 4,
-            background: '#f0f0f0',
-            borderRadius: 2,
-            position: 'relative'
-          }}>
-            <div style={{
-              position: 'absolute',
-              left: 0,
-              top: 0,
-              height: '100%',
-              width: `${duration ? (currentTime / duration) * 100 : 0}%`,
-              background: '#1890ff',
-              borderRadius: 2,
-              transition: 'width 0.1s'
-            }} />
-          </div>
-          <span style={{ fontSize: 12, color: '#8c8c8c', minWidth: 38 }}>
-            {formatTime(duration)}
-          </span>
-        </div>
-
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          minWidth: 150
-        }}>
-          <SoundOutlined style={{ color: '#8c8c8c', fontSize: 16 }} />
-          <Slider
-            value={volume}
-            onChange={handleVolumeChange}
-            style={{ flex: 1, margin: 0 }}
-            tooltip={{ formatter: (val) => `${val}%` }}
-          />
-        </div>
+      {/* Volume */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: 80 }}>
+        <SoundOutlined style={{ color: '#697386', fontSize: 12 }} />
+        <Slider
+          value={volume}
+          onChange={handleVolumeChange}
+          style={{ flex: 1, margin: 0 }}
+          tooltip={{ formatter: null }}
+          trackStyle={{ backgroundColor: '#635bff', height: 3 }}
+          railStyle={{ height: 3 }}
+          handleStyle={{
+            borderColor: '#635bff',
+            boxShadow: 'none',
+            width: 10,
+            height: 10,
+            marginTop: -3.5
+          }}
+        />
       </div>
     </div>
   );
-
-  if (sticky) {
-    return (
-      <div style={{
-        position: 'sticky',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        zIndex: 1000,
-        width: '100%'
-      }}>
-        {playerContent}
-      </div>
-    );
-  }
-
-  return playerContent;
 }
 
 export default AudioPlayer;

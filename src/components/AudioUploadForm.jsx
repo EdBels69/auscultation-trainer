@@ -1,21 +1,25 @@
-import { useState } from 'react';
-import { Form, Input, Select, Button, Upload, Card, message, Image } from 'antd';
-import { UploadOutlined, InboxOutlined, PictureOutlined } from '@ant-design/icons';
+import { useState, useEffect } from 'react';
+import { Form, Input, Select, Button, Upload, message, Row, Col } from 'antd';
+import { UploadOutlined, SoundOutlined, PictureOutlined } from '@ant-design/icons';
 import { addSound } from '../services/api';
 
 const { Option } = Select;
-const { Dragger } = Upload;
 
-function AudioUploadForm({ onUploadSuccess }) {
+function AudioUploadForm({ onUploadSuccess, initialNodeKey = null, initialNodeName = null }) {
     const [form] = Form.useForm();
     const [uploading, setUploading] = useState(false);
     const [fileList, setFileList] = useState([]);
     const [imageFile, setImageFile] = useState(null);
-    const [imagePreview, setImagePreview] = useState(null);
+
+    useEffect(() => {
+        if (initialNodeName) {
+            form.setFieldsValue({ name: initialNodeName });
+        }
+    }, [initialNodeName, form]);
 
     const handleUpload = async (values) => {
         if (fileList.length === 0) {
-            message.error('Пожалуйста, выберите аудиофайл');
+            message.error('Выберите аудиофайл');
             return;
         }
 
@@ -23,32 +27,30 @@ function AudioUploadForm({ onUploadSuccess }) {
         setUploading(true);
 
         try {
-            await addSound(values, file, imageFile);
-            message.success('Аудиозапись успешно добавлена');
+            const submissionData = {
+                ...values,
+                linked_node_key: initialNodeKey
+            };
+
+            await addSound(submissionData, file, imageFile);
+            message.success('Запись добавлена');
             form.resetFields();
             setFileList([]);
             setImageFile(null);
-            setImagePreview(null);
             if (onUploadSuccess) onUploadSuccess();
         } catch (error) {
             console.error('Upload error:', error);
-            message.error('Ошибка при загрузке: ' + error.message);
+            message.error('Ошибка: ' + error.message);
         } finally {
             setUploading(false);
         }
     };
 
-    const uploadProps = {
-        onRemove: (file) => {
-            const index = fileList.indexOf(file);
-            const newFileList = fileList.slice();
-            newFileList.splice(index, 1);
-            setFileList(newFileList);
-        },
+    const audioUploadProps = {
+        onRemove: () => setFileList([]),
         beforeUpload: (file) => {
-            const isAudio = file.type.startsWith('audio/');
-            if (!isAudio) {
-                message.error('Можно загружать только аудио файлы!');
+            if (!file.type.startsWith('audio/')) {
+                message.error('Только аудио файлы!');
                 return Upload.LIST_IGNORE;
             }
             setFileList([file]);
@@ -59,110 +61,129 @@ function AudioUploadForm({ onUploadSuccess }) {
 
     const imageUploadProps = {
         beforeUpload: (file) => {
-            const isImage = file.type.startsWith('image/');
-            if (!isImage) {
-                message.error('Можно загружать только изображения!');
+            if (!file.type.startsWith('image/')) {
+                message.error('Только изображения!');
                 return Upload.LIST_IGNORE;
             }
             setImageFile(file);
-            const reader = new FileReader();
-            reader.onload = (e) => setImagePreview(e.target.result);
-            reader.readAsDataURL(file);
             return false;
         },
-        onRemove: () => {
-            setImageFile(null);
-            setImagePreview(null);
-        },
+        onRemove: () => setImageFile(null),
         fileList: imageFile ? [imageFile] : [],
     };
 
     return (
-        <Card title="Добавить новую запись" style={{ marginBottom: 32 }}>
+        <div style={{
+            background: '#fafbfc',
+            borderRadius: 8,
+            padding: 16,
+            marginBottom: 16,
+            border: '1px solid #e3e8ee'
+        }}>
+            <div style={{
+                fontSize: 13,
+                fontWeight: 600,
+                marginBottom: 12,
+                color: '#0a2540'
+            }}>
+                Добавить запись
+            </div>
+
             <Form
                 form={form}
                 layout="vertical"
                 onFinish={handleUpload}
+                size="small"
             >
-                <Form.Item
-                    name="name"
-                    label="Название"
-                    rules={[{ required: true, message: 'Введите название' }]}
+                <Row gutter={12}>
+                    <Col span={12}>
+                        <Form.Item
+                            name="name"
+                            label="Название"
+                            rules={[{ required: true, message: 'Обязательно' }]}
+                            style={{ marginBottom: 8 }}
+                        >
+                            <Input placeholder="Название звука" />
+                        </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                        <Form.Item
+                            name="category"
+                            label="Категория"
+                            initialValue={initialNodeKey ? "cardiac" : undefined}
+                            rules={[{ required: true, message: 'Обязательно' }]}
+                            style={{ marginBottom: 8 }}
+                        >
+                            <Select placeholder="Выбрать">
+                                <Option value="cardiac">Кардиология</Option>
+                                <Option value="pulmonary">Пульмонология</Option>
+                            </Select>
+                        </Form.Item>
+                    </Col>
+                </Row>
+
+                <Row gutter={12}>
+                    <Col span={12}>
+                        <Form.Item
+                            name="position"
+                            label="Точка аускультации"
+                            rules={[{ required: true, message: 'Обязательно' }]}
+                            style={{ marginBottom: 8 }}
+                        >
+                            <Input placeholder="2-е межреберье" />
+                        </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                        <Form.Item
+                            name="description"
+                            label="Описание"
+                            rules={[{ required: true, message: 'Обязательно' }]}
+                            style={{ marginBottom: 8 }}
+                        >
+                            <Input placeholder="Краткое описание" />
+                        </Form.Item>
+                    </Col>
+                </Row>
+
+                <Row gutter={12}>
+                    <Col span={16}>
+                        <Form.Item
+                            label="Аудиофайл"
+                            required
+                            style={{ marginBottom: 8 }}
+                        >
+                            <Upload {...audioUploadProps} maxCount={1}>
+                                <Button icon={<SoundOutlined />} block>
+                                    {fileList.length ? fileList[0].name : 'Выбрать MP3/WAV'}
+                                </Button>
+                            </Upload>
+                        </Form.Item>
+                    </Col>
+                    <Col span={8}>
+                        <Form.Item
+                            label="Картинка"
+                            style={{ marginBottom: 8 }}
+                        >
+                            <Upload {...imageUploadProps} maxCount={1}>
+                                <Button icon={<PictureOutlined />} block>
+                                    {imageFile ? '✓' : 'Файл'}
+                                </Button>
+                            </Upload>
+                        </Form.Item>
+                    </Col>
+                </Row>
+
+                <Button
+                    type="primary"
+                    htmlType="submit"
+                    loading={uploading}
+                    icon={<UploadOutlined />}
+                    block
                 >
-                    <Input placeholder="Например: Стеноз аорты" />
-                </Form.Item>
-
-                <Form.Item
-                    name="category"
-                    label="Категория"
-                    rules={[{ required: true, message: 'Выберите категорию' }]}
-                >
-                    <Select placeholder="Выберите категорию">
-                        <Option value="cardiac">Кардиология</Option>
-                        <Option value="pulmonary">Пульмонология</Option>
-                    </Select>
-                </Form.Item>
-
-                <Form.Item
-                    name="position"
-                    label="Точка аускультации"
-                    rules={[{ required: true, message: 'Укажите точку аускультации' }]}
-                >
-                    <Input placeholder="Например: 2-е межреберье справа" />
-                </Form.Item>
-
-                <Form.Item
-                    name="description"
-                    label="Описание"
-                    rules={[{ required: true, message: 'Введите описание' }]}
-                >
-                    <Input.TextArea rows={4} placeholder="Опишите характеристики звука..." />
-                </Form.Item>
-
-                <Form.Item label="Изображение (необязательно)">
-                    <Upload {...imageUploadProps} listType="picture-card" maxCount={1}>
-                        {!imageFile && (
-                            <div>
-                                <PictureOutlined />
-                                <div style={{ marginTop: 8 }}>Загрузить</div>
-                            </div>
-                        )}
-                    </Upload>
-                    {imagePreview && (
-                        <Image
-                            src={imagePreview}
-                            alt="Preview"
-                            style={{ marginTop: 8, maxWidth: 200 }}
-                        />
-                    )}
-                </Form.Item>
-
-                <Form.Item label="Аудиофайл" required>
-                    <Dragger {...uploadProps} style={{ padding: 20 }}>
-                        <p className="ant-upload-drag-icon">
-                            <InboxOutlined />
-                        </p>
-                        <p className="ant-upload-text">Нажмите или перетащите файл сюда</p>
-                        <p className="ant-upload-hint">
-                            Поддерживаются MP3, WAV файлы
-                        </p>
-                    </Dragger>
-                </Form.Item>
-
-                <Form.Item>
-                    <Button
-                        type="primary"
-                        htmlType="submit"
-                        loading={uploading}
-                        icon={<UploadOutlined />}
-                        size="large"
-                        block
-                    >
-                        {uploading ? 'Загрузка...' : 'Сохранить запись'}
-                    </Button>
-                </Form.Item>
+                    Сохранить
+                </Button>
             </Form>
-        </Card>
+        </div>
     );
 }
 

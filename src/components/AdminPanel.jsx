@@ -2,10 +2,9 @@ import { useState, useEffect } from 'react';
 import { Button, Typography, Spin, Tabs } from 'antd';
 import { supabase, signOut } from '../services/supabase';
 import { getSounds } from '../services/api';
+import StructureManager from './StructureManager';
 import TheoryManager from './TheoryManager';
 import AdminLogin from './AdminLogin';
-import AudioUploadForm from './AudioUploadForm';
-import AudioList from './AudioList';
 
 const { Title } = Typography;
 
@@ -52,13 +51,8 @@ function AdminPanel({ audioRecords, onAudioRecordsUpdate }) {
     const items = [
         {
             key: '1',
-            label: 'Аудиозаписи',
-            children: (
-                <>
-                    <AudioUploadForm onUploadSuccess={refreshRecords} />
-                    <AudioList audioRecords={audioRecords} onUpdate={refreshRecords} />
-                </>
-            ),
+            label: 'Структура Обучения',
+            children: <StructureManager audioRecords={audioRecords} onAudioUpdate={refreshRecords} />,
         },
         {
             key: '2',
