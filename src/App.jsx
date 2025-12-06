@@ -14,9 +14,9 @@ const TheorySection = lazy(() => import('./components/TheorySection'));
 function App() {
   const [currentSection, setCurrentSection] = useState('learning');
   const [audioRecords, setAudioRecords] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Don't block UI on initial load
 
-  // Load records on mount
+  // Load records in background
   useEffect(() => {
     const loadRecords = async () => {
       try {
@@ -25,12 +25,12 @@ function App() {
       } catch (error) {
         console.error('Error loading records:', error);
         message.error('Ошибка загрузки данных');
-      } finally {
-        setLoading(false);
       }
     };
 
-    loadRecords();
+    // Start loading after a short delay to let UI render first
+    const timer = setTimeout(loadRecords, 100);
+    return () => clearTimeout(timer);
   }, []);
 
   // Memoize section change handler

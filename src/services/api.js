@@ -1,7 +1,17 @@
 import { supabase } from './supabase';
 
+// Simple in-memory cache
+let soundsCache = null;
+let cacheTime = null;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 // Get all sounds
-export async function getSounds() {
+export async function getSounds(forceRefresh = false) {
+    // Return cached data if available and not expired
+    if (!forceRefresh && soundsCache && cacheTime && (Date.now() - cacheTime < CACHE_DURATION)) {
+        return soundsCache;
+    }
+
     const { data, error } = await supabase
         .from('sounds')
         .select('*')
@@ -10,7 +20,7 @@ export async function getSounds() {
     if (error) throw error;
 
     // Map to match application structure
-    return data.map(item => {
+    const sounds = data.map(item => {
         // Get public URL from file_path
         const audioUrl = item.file_path
             ? supabase.storage.from('sounds').getPublicUrl(item.file_path).data.publicUrl
@@ -30,6 +40,12 @@ export async function getSounds() {
             linkedNodeKey: item.linked_node_key
         };
     });
+
+    // Update cache
+    soundsCache = sounds;
+    cacheTime = Date.now();
+
+    return sounds;
 }
 
 // Add a new sound with audio file and optional image

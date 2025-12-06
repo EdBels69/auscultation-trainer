@@ -33,7 +33,7 @@ function AdminPanel({ audioRecords, onAudioRecordsUpdate }) {
 
     const refreshRecords = async () => {
         try {
-            const updatedRecords = await getSounds();
+            const updatedRecords = await getSounds(true); // Force refresh cache
             onAudioRecordsUpdate(updatedRecords);
         } catch (error) {
             console.error('Error refreshing records:', error);
