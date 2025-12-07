@@ -222,3 +222,42 @@ input,
 .rhap_button-clear:hover {
   color: #635bff !important;
 }
+
+/* Learning Section Tree Styles */
+.ant-tree {
+  font-size: 13px !important;
+}
+
+.ant-tree .ant-tree-treenode {
+  padding: 4px 0 !important;
+  align-items: center;
+}
+
+.ant-tree .ant-tree-node-content-wrapper {
+  padding: 4px 8px !important;
+  border-radius: 6px !important;
+  transition: all 0.15s ease !important;
+}
+
+.ant-tree .ant-tree-node-content-wrapper:hover {
+  background: rgba(99, 91, 255, 0.06) !important;
+}
+
+.ant-tree .ant-tree-node-selected .ant-tree-node-content-wrapper,
+.ant-tree .ant-tree-node-content-wrapper.ant-tree-node-selected {
+  background: rgba(99, 91, 255, 0.12) !important;
+  color: #635bff !important;
+  font-weight: 500 !important;
+}
+
+.ant-tree .ant-tree-switcher {
+  color: #8792a2 !important;
+}
+
+.ant-tree .ant-tree-indent-unit {
+  width: 16px !important;
+}
+
+.ant-tree-show-line .ant-tree-indent-unit::before {
+  border-color: #e3e8ee !important;
+}

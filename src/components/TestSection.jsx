@@ -253,12 +253,12 @@ function TestSection({ audioRecords }) {
                                             : 'transparent'
                                     }}
                                 >
-                                    <span style={{ flex: 1 }}>{answer.text}</span>
+                                    <span style={{ flex: 1, display: 'block' }}>{answer.text}</span>
                                     {showExplanation && answer.isCorrect && (
-                                        <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 18 }} />
+                                        <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 18, marginLeft: 8 }} />
                                     )}
                                     {showExplanation && answer.id === userAnswer && !answer.isCorrect && (
-                                        <CloseCircleOutlined style={{ color: '#ff4d4f', fontSize: 18 }} />
+                                        <CloseCircleOutlined style={{ color: '#ff4d4f', fontSize: 18, marginLeft: 8 }} />
                                     )}
                                 </Radio>
                             ))}
@@ -286,7 +286,7 @@ function TestSection({ audioRecords }) {
                     )}
                 </Space>
             </Card>
-        </div>
+        </div >
     );
 }
 

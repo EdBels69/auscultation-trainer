@@ -11,9 +11,7 @@ import {
     Space,
     Tag,
     message,
-    Collapse,
-    Upload,
-    Alert
+    Upload
 } from 'antd';
 import {
     EditOutlined,
@@ -21,39 +19,30 @@ import {
     CloseOutlined,
     DeleteOutlined,
     SoundOutlined,
-    UploadOutlined,
-    CheckCircleOutlined,
-    WarningOutlined,
-    PictureOutlined
+    UploadOutlined
 } from '@ant-design/icons';
 import { updateSound, updateSoundWithFile, deleteSound } from '../services/api';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { Option } = Select;
-const { Panel } = Collapse;
 
 function AudioList({ audioRecords, onUpdate }) {
     const [editingId, setEditingId] = useState(null);
     const [editForm] = Form.useForm();
     const [audioFile, setAudioFile] = useState(null);
-    const [imageFile, setImageFile] = useState(null);
 
     const startEditing = (record) => {
         setEditingId(record.id);
         setAudioFile(null);
-        setImageFile(null);
         editForm.setFieldsValue({
-            name: record.name,
-            description: record.description,
-            category: record.category,
-            position: record.position
+            position: record.position,
+            category: record.category
         });
     };
 
     const cancelEditing = () => {
         setEditingId(null);
         setAudioFile(null);
-        setImageFile(null);
         editForm.resetFields();
     };
 
@@ -61,23 +50,29 @@ function AudioList({ audioRecords, onUpdate }) {
         try {
             const values = await editForm.validateFields();
 
-            // Use file upload version if new files provided
-            if (audioFile || imageFile) {
+            const updateData = {
+                ...values,
+                name: item.name,
+                description: values.position,
+                linked_node_key: item.linkedNodeKey
+            };
+
+            if (audioFile) {
                 await updateSoundWithFile(
                     item.id,
-                    { ...values, linked_node_key: item.linkedNodeKey },
+                    updateData,
                     audioFile,
-                    imageFile,
+                    null,
+                    null,
                     item.filePath
                 );
             } else {
-                await updateSound(item.id, { ...values, linked_node_key: item.linkedNodeKey });
+                await updateSound(item.id, updateData);
             }
 
             message.success('Запись обновлена');
             setEditingId(null);
             setAudioFile(null);
-            setImageFile(null);
             if (onUpdate) onUpdate();
         } catch (error) {
             console.error('Update error:', error);
@@ -96,217 +91,139 @@ function AudioList({ audioRecords, onUpdate }) {
         }
     };
 
+    const hasAudio = (record) => record.audioUrl && record.audioUrl !== '';
+
     const audioUploadProps = {
+        accept: 'audio/*',
         beforeUpload: (file) => {
-            const isAudio = file.type.startsWith('audio/');
-            if (!isAudio) {
-                message.error('Можно загружать только аудио файлы!');
-                return Upload.LIST_IGNORE;
-            }
             setAudioFile(file);
             return false;
         },
         onRemove: () => setAudioFile(null),
-        fileList: audioFile ? [audioFile] : [],
+        fileList: audioFile ? [audioFile] : []
     };
 
-    const imageUploadProps = {
-        beforeUpload: (file) => {
-            const isImage = file.type.startsWith('image/');
-            if (!isImage) {
-                message.error('Можно загружать только изображения!');
-                return Upload.LIST_IGNORE;
-            }
-            setImageFile(file);
-            return false;
-        },
-        onRemove: () => setImageFile(null),
-        fileList: imageFile ? [imageFile] : [],
-    };
-
-    // Grouping logic
-    const groupedRecords = audioRecords.reduce((acc, record) => {
-        const key = record.name.trim();
-        if (!acc[key]) {
-            acc[key] = [];
-        }
-        acc[key].push(record);
-        return acc;
-    }, {});
-
-    const hasAudio = (item) => item.filePath && item.filePath !== 'placeholder';
-
-    const renderRecordCard = (item) => (
-        <Card
-            key={item.id}
-            style={{ marginBottom: 16 }}
-            actions={[
-                editingId === item.id ? (
-                    <Button
-                        type="link"
-                        icon={<SaveOutlined />}
-                        onClick={() => handleUpdate(item)}
-                    >
-                        Сохранить
-                    </Button>
-                ) : (
-                    <Button
-                        type="text"
-                        icon={<EditOutlined />}
-                        onClick={() => startEditing(item)}
-                    >
-                        Изменить
-                    </Button>
-                ),
-                editingId === item.id ? (
-                    <Button
-                        type="link"
-                        danger
-                        icon={<CloseOutlined />}
-                        onClick={cancelEditing}
-                    >
-                        Отмена
-                    </Button>
-                ) : (
-                    <Popconfirm
-                        title="Удалить запись?"
-                        description="Это действие нельзя отменить"
-                        onConfirm={() => handleDelete(item.id, item.filePath)}
-                        okText="Да"
-                        cancelText="Нет"
-                    >
-                        <Button type="text" danger icon={<DeleteOutlined />}>
-                            Удалить
-                        </Button>
-                    </Popconfirm>
-                )
-            ]}
-        >
-            {editingId === item.id ? (
-                <Form form={editForm} layout="vertical">
-                    <Form.Item name="name" label="Название" style={{ marginBottom: 8 }}>
-                        <Input />
-                    </Form.Item>
-                    <Form.Item name="category" label="Категория" style={{ marginBottom: 8 }}>
-                        <Select>
-                            <Option value="cardiac">Кардиология</Option>
-                            <Option value="pulmonary">Пульмонология</Option>
-                        </Select>
-                    </Form.Item>
-                    <Form.Item name="position" label="Точка аускультации" style={{ marginBottom: 8 }}>
-                        <Input />
-                    </Form.Item>
-                    <Form.Item name="description" label="Описание" style={{ marginBottom: 8 }}>
-                        <Input.TextArea rows={3} />
-                    </Form.Item>
-
-                    {/* Audio File Upload */}
-                    <Form.Item label="Аудиофайл" style={{ marginBottom: 8 }}>
-                        {hasAudio(item) ? (
-                            <Alert
-                                message={`Текущий файл: ${item.fileName || 'Загружен'}`}
-                                type="success"
-                                showIcon
-                                icon={<CheckCircleOutlined />}
-                                style={{ marginBottom: 8 }}
-                            />
-                        ) : (
-                            <Alert
-                                message="Аудиофайл не загружен!"
-                                type="warning"
-                                showIcon
-                                icon={<WarningOutlined />}
-                                style={{ marginBottom: 8 }}
-                            />
-                        )}
-                        <Upload {...audioUploadProps}>
-                            <Button icon={<UploadOutlined />}>
-                                {hasAudio(item) ? 'Заменить аудио' : 'Загрузить аудио'}
-                            </Button>
-                        </Upload>
-                    </Form.Item>
-
-                    {/* Image Upload */}
-                    <Form.Item label="Изображение (необязательно)" style={{ marginBottom: 0 }}>
-                        <Upload {...imageUploadProps}>
-                            <Button icon={<PictureOutlined />}>
-                                {item.imageUrl ? 'Заменить изображение' : 'Добавить изображение'}
-                            </Button>
-                        </Upload>
-                    </Form.Item>
-                </Form>
-            ) : (
-                <>
-                    <Card.Meta
-                        avatar={
-                            <div style={{ position: 'relative' }}>
-                                <SoundOutlined style={{
-                                    fontSize: 24,
-                                    color: item.category === 'cardiac' ? '#ff4d4f' : '#1890ff'
-                                }} />
-                                {!hasAudio(item) && (
-                                    <WarningOutlined style={{
-                                        position: 'absolute',
-                                        top: -4,
-                                        right: -8,
-                                        fontSize: 12,
-                                        color: '#faad14'
-                                    }} />
-                                )}
-                            </div>
-                        }
-                        title={
-                            <Space>
-                                {item.name}
-                                {!hasAudio(item) && (
-                                    <Tag color="warning" style={{ fontSize: 10 }}>Нет аудио</Tag>
-                                )}
-                            </Space>
-                        }
-                        description={
-                            <Space direction="vertical" size={4} style={{ width: '100%' }}>
-                                <Tag color={item.category === 'cardiac' ? 'red' : 'blue'}>
-                                    {item.category === 'cardiac' ? 'Кардиология' : 'Пульмонология'}
-                                </Tag>
-                                <Text type="secondary" style={{ fontSize: 12 }}>
-                                    {item.position}
-                                </Text>
-                                <Text ellipsis={{ tooltip: item.description }}>
-                                    {item.description}
-                                </Text>
-                                {item.fileName && hasAudio(item) && (
-                                    <Text type="secondary" style={{ fontSize: 10 }}>
-                                        Файл: {item.fileName}
-                                    </Text>
-                                )}
-                            </Space>
-                        }
-                    />
-                </>
-            )}
-        </Card>
-    );
+    if (!audioRecords || audioRecords.length === 0) {
+        return (
+            <div style={{
+                textAlign: 'center',
+                padding: 24,
+                background: '#fafbfc',
+                borderRadius: 8,
+                color: '#8898aa'
+            }}>
+                Нет аудиозаписей
+            </div>
+        );
+    }
 
     return (
-        <>
-            <Title level={3}>Список записей ({audioRecords.length})</Title>
-            {Object.entries(groupedRecords).map(([name, records]) => {
-                if (records.length === 1) {
-                    return renderRecordCard(records[0]);
-                }
-                return (
-                    <Collapse key={name} style={{ marginBottom: 16 }}>
-                        <Panel header={`${name} (${records.length} вариантов)`} key="1">
-                            <List
-                                grid={{ gutter: 16, xs: 1, sm: 1, md: 2, lg: 2, xl: 3, xxl: 3 }}
-                                dataSource={records}
-                                renderItem={renderRecordCard}
-                            />
-                        </Panel>
-                    </Collapse>
-                );
-            })}
-        </>
+        <div>
+            <List
+                dataSource={audioRecords}
+                renderItem={(item) => {
+                    const isEditing = editingId === item.id;
+
+                    return (
+                        <Card
+                            size="small"
+                            style={{ marginBottom: 8 }}
+                            bodyStyle={{ padding: 12 }}
+                        >
+                            {isEditing ? (
+                                <Form form={editForm} layout="vertical" size="small">
+                                    <Form.Item
+                                        name="position"
+                                        label="Информация о пациенте"
+                                        rules={[{ required: true }]}
+                                        style={{ marginBottom: 8 }}
+                                    >
+                                        <Input placeholder="М, 54 года, анамнез..." />
+                                    </Form.Item>
+
+                                    <Form.Item
+                                        name="category"
+                                        label="Категория"
+                                        rules={[{ required: true }]}
+                                        style={{ marginBottom: 8 }}
+                                    >
+                                        <Select>
+                                            <Option value="cardiac">Кардиология</Option>
+                                            <Option value="pulmonary">Пульмонология</Option>
+                                        </Select>
+                                    </Form.Item>
+
+                                    <div style={{ marginBottom: 12 }}>
+                                        <Upload {...audioUploadProps} maxCount={1}>
+                                            <Button icon={<UploadOutlined />} size="small">
+                                                {hasAudio(item) ? 'Заменить аудио' : 'Загрузить аудио'}
+                                            </Button>
+                                        </Upload>
+                                        {audioFile && (
+                                            <Text type="success" style={{ fontSize: 11, marginLeft: 8 }}>
+                                                ✓ {audioFile.name}
+                                            </Text>
+                                        )}
+                                    </div>
+
+                                    <Space>
+                                        <Button
+                                            type="primary"
+                                            size="small"
+                                            icon={<SaveOutlined />}
+                                            onClick={() => handleUpdate(item)}
+                                        >
+                                            Сохранить
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            icon={<CloseOutlined />}
+                                            onClick={cancelEditing}
+                                        >
+                                            Отмена
+                                        </Button>
+                                    </Space>
+                                </Form>
+                            ) : (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <SoundOutlined style={{ color: hasAudio(item) ? '#52c41a' : '#faad14' }} />
+                                            <Text strong>{item.name}</Text>
+                                            <Tag color={item.category === 'cardiac' ? 'red' : 'blue'}>
+                                                {item.category === 'cardiac' ? 'Кард' : 'Пульм'}
+                                            </Tag>
+                                        </div>
+                                        <Text type="secondary" style={{ fontSize: 12 }}>
+                                            {item.position}
+                                        </Text>
+                                    </div>
+                                    <Space>
+                                        <Button
+                                            size="small"
+                                            icon={<EditOutlined />}
+                                            onClick={() => startEditing(item)}
+                                        >
+                                            Изменить
+                                        </Button>
+                                        <Popconfirm
+                                            title="Удалить запись?"
+                                            onConfirm={() => handleDelete(item.id, item.filePath)}
+                                            okText="Да"
+                                            cancelText="Нет"
+                                        >
+                                            <Button size="small" danger icon={<DeleteOutlined />}>
+                                                Удалить
+                                            </Button>
+                                        </Popconfirm>
+                                    </Space>
+                                </div>
+                            )}
+                        </Card>
+                    );
+                }}
+            />
+        </div>
     );
 }
 

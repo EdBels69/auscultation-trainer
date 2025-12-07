@@ -1,20 +1,19 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Row, Col, Typography, Empty, Drawer, Button, Tag, Spin } from 'antd';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Typography, Empty, Drawer, Button, Spin } from 'antd';
 import { MenuOutlined } from '@ant-design/icons';
-import SoundCard from './SoundCard';
+
 import TopicTree from './TopicTree';
 import { getLearningNodes } from '../services/api';
 import { buildLearningTree } from '../utils/structureUtils';
 import AudioPlayer from './AudioPlayer';
 
-const { Title, Text } = Typography;
+const { Title } = Typography;
 
 function LearningSection({ audioRecords }) {
     const [structure, setStructure] = useState({ systems: [] });
     const [loading, setLoading] = useState(true);
-    const [selectedCategory, setSelectedCategory] = useState('heart_sounds');
+    const [selectedNodeKey, setSelectedNodeKey] = useState('heart_sounds');
     const [selectedSystem, setSelectedSystem] = useState('cardiology');
-    const [selectedSubFilter, setSelectedSubFilter] = useState(null);
     const [selectedAudio, setSelectedAudio] = useState(null);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
@@ -44,72 +43,105 @@ function LearningSection({ audioRecords }) {
         loadStructure();
     }, []);
 
-    // Get current category data
-    const currentSystem = structure.systems.find(s => s.key === selectedSystem);
-    const currentCategory = currentSystem?.categories?.find(c => c.key === selectedCategory);
+    // Find node by key recursively
+    const findNodeByKey = useCallback((nodes, key) => {
+        for (const node of nodes) {
+            if (node.key === key) return node;
+            // Check categories
+            if (node.categories) {
+                const found = findNodeByKey(node.categories, key);
+                if (found) return found;
+            }
+            // Check items
+            if (node.items) {
+                const found = findNodeByKey(node.items, key);
+                if (found) return found;
+            }
+            // Check subtypes
+            if (node.subtypes) {
+                const found = findNodeByKey(node.subtypes, key);
+                if (found) return found;
+            }
+        }
+        return null;
+    }, []);
 
-    // Get items (sub-filters) for the current category
-    const subFilters = currentCategory?.items || [];
+    // Get current selected node
+    const currentNode = useMemo(() => {
+        return findNodeByKey(structure.systems, selectedNodeKey);
+    }, [structure.systems, selectedNodeKey, findNodeByKey]);
 
-    // Filter audio records based on selected system and subfilter (memoized)
+    // Build breadcrumb path
+    const getBreadcrumbPath = useCallback((nodes, targetKey, path = []) => {
+        for (const node of nodes) {
+            const newPath = [...path, node];
+            if (node.key === targetKey) return newPath;
+
+            const childArrays = [node.categories, node.items, node.subtypes].filter(Boolean);
+            for (const children of childArrays) {
+                const found = getBreadcrumbPath(children, targetKey, newPath);
+                if (found) return found;
+            }
+        }
+        return null;
+    }, []);
+
+    const breadcrumbPath = useMemo(() => {
+        return getBreadcrumbPath(structure.systems, selectedNodeKey) || [];
+    }, [structure.systems, selectedNodeKey, getBreadcrumbPath]);
+
+    // Рекурсивная проверка - ищем совпадение по ключу во всех потомках
+    const matchesNodeOrDescendants = useCallback((node, targetKey) => {
+        if (!node) return false;
+        if (node.key === targetKey) return true;
+        // Проверяем items (подкатегории)
+        if (node.items) {
+            for (const item of node.items) {
+                if (matchesNodeOrDescendants(item, targetKey)) return true;
+            }
+        }
+        // Проверяем subtypes (подтипы)
+        if (node.subtypes) {
+            for (const sub of node.subtypes) {
+                if (typeof sub === 'object' && matchesNodeOrDescendants(sub, targetKey)) return true;
+            }
+        }
+        // Проверяем categories
+        if (node.categories) {
+            for (const cat of node.categories) {
+                if (matchesNodeOrDescendants(cat, targetKey)) return true;
+            }
+        }
+        return false;
+    }, []);
+
+    // Filter audio records based on selected node (memoized)
     const filteredRecords = useMemo(() => {
         return audioRecords.filter(r => {
-            // Only show complete records (with audio, image, and description)
+            // Only show records with audio file
             const hasAudio = r.audioUrl && r.audioUrl !== '';
-            const hasImage = r.imageUrl && r.imageUrl !== '';
-            const hasDescription = r.description && r.description.trim() !== '';
-            if (!hasAudio || !hasImage || !hasDescription) return false;
+            if (!hasAudio) return false;
 
-            // First: check system (cardiac/pulmonary)
+            // Check system (cardiac/pulmonary)
             let requiredCategory = null;
             if (selectedSystem === 'cardiology') requiredCategory = 'cardiac';
             else if (selectedSystem === 'pulmonology') requiredCategory = 'pulmonary';
 
             if (requiredCategory && r.category !== requiredCategory) return false;
 
-            // If a specific sub-filter (Item level) is selected, filter by linkedNodeKey
-            if (selectedSubFilter) {
-                if (r.linkedNodeKey === selectedSubFilter) return true;
-                // Check subtypes of the selected item
-                const itemConfig = subFilters.find(f => f.key === selectedSubFilter);
-                if (itemConfig && itemConfig.subtypes) {
-                    const isSubtypeMatch = itemConfig.subtypes.some(sub =>
-                        typeof sub === 'string' ? false : r.linkedNodeKey === sub.key
-                    );
-                    if (isSubtypeMatch) return true;
-                }
-                return false;
-            }
-
-            // Filter by category - check if linkedNodeKey matches category or any of its items/subtypes
-            if (currentCategory) {
-                // Check if linked to the category itself
-                if (r.linkedNodeKey === currentCategory.key) return true;
-
-                // Check if linked to any item in the category
-                if (currentCategory.items) {
-                    for (const item of currentCategory.items) {
-                        if (r.linkedNodeKey === item.key) return true;
-                        // Check subtypes
-                        if (item.subtypes) {
-                            const isSubtypeMatch = item.subtypes.some(sub =>
-                                typeof sub === 'string' ? false : r.linkedNodeKey === sub.key
-                            );
-                            if (isSubtypeMatch) return true;
-                        }
-                    }
-                }
+            // Filter by selected node - ONLY show records linked DIRECTLY to this node
+            if (selectedNodeKey && r.linkedNodeKey !== selectedNodeKey) {
                 return false;
             }
 
             return true;
         });
-    }, [audioRecords, selectedSystem, selectedSubFilter, subFilters, currentCategory]);
+    }, [audioRecords, selectedSystem, selectedNodeKey]);
 
     // Get first record ID for stable comparison
     const firstRecordId = filteredRecords.length > 0 ? filteredRecords[0].id : null;
 
-    // Auto-select first audio (only when category/filter changes)
+    // Auto-select first audio (only when node changes)
     useEffect(() => {
         if (loading) return;
 
@@ -118,12 +150,11 @@ function LearningSection({ audioRecords }) {
             setSelectedAudio(filteredRecords[0] || null);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedCategory, selectedSystem, selectedSubFilter, loading, firstRecordId]);
+    }, [selectedNodeKey, selectedSystem, loading, firstRecordId]);
 
-    const handleCategorySelect = (categoryKey, systemKey) => {
-        setSelectedCategory(categoryKey);
+    const handleNodeSelect = (nodeKey, systemKey) => {
+        setSelectedNodeKey(nodeKey);
         setSelectedSystem(systemKey);
-        setSelectedSubFilter(null);
         setMobileMenuOpen(false);
     };
 
@@ -134,7 +165,7 @@ function LearningSection({ audioRecords }) {
             minHeight: 'calc(100vh - 64px)'
         },
         sidebar: {
-            width: 260,
+            width: 280,
             flexShrink: 0,
             position: 'sticky',
             top: 64,
@@ -153,34 +184,20 @@ function LearningSection({ audioRecords }) {
         breadcrumb: {
             fontSize: 13,
             color: '#697386',
-            marginBottom: 8
+            marginBottom: 8,
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            gap: 4
         },
         breadcrumbLink: {
             color: '#635bff',
-            cursor: 'pointer'
-        },
-        filterBar: {
-            display: 'flex',
-            gap: 8,
-            flexWrap: 'wrap',
-            marginBottom: 24,
-            paddingBottom: 16,
-            borderBottom: '1px solid #e3e8ee'
-        },
-        filterChip: {
             cursor: 'pointer',
-            borderRadius: 16,
-            fontSize: 12,
-            padding: '4px 12px',
-            border: '1px solid #e3e8ee',
-            background: '#fff',
-            color: '#3c4257',
-            transition: 'all 0.15s'
+            transition: 'opacity 0.15s'
         },
-        filterChipActive: {
-            background: '#635bff',
-            borderColor: '#635bff',
-            color: '#fff'
+        breadcrumbSeparator: {
+            color: '#8898aa',
+            margin: '0 2px'
         }
     };
 
@@ -188,14 +205,24 @@ function LearningSection({ audioRecords }) {
         return <div style={{ padding: 50, textAlign: 'center' }}><Spin size="large" /></div>;
     }
 
+    // Get display name for system
+    const getSystemName = (key) => {
+        if (key === 'cardiology') return 'Кардиология';
+        if (key === 'pulmonology') return 'Пульмонология';
+        return key;
+    };
+
+    // Derived data from the first record (representative of the topic)
+    const topicRecord = filteredRecords.length > 0 ? filteredRecords[0] : null;
+
     return (
         <div style={styles.layout}>
             {/* Desktop Sidebar */}
             {!isMobile && (
                 <div style={styles.sidebar}>
                     <TopicTree
-                        onSelect={handleCategorySelect}
-                        selectedCategory={selectedCategory}
+                        onSelect={handleNodeSelect}
+                        selectedCategory={selectedNodeKey}
                         systems={structure.systems}
                     />
                 </div>
@@ -210,8 +237,8 @@ function LearningSection({ audioRecords }) {
                 width={280}
             >
                 <TopicTree
-                    onSelect={handleCategorySelect}
-                    selectedCategory={selectedCategory}
+                    onSelect={handleNodeSelect}
+                    selectedCategory={selectedNodeKey}
                     systems={structure.systems}
                 />
             </Drawer>
@@ -229,140 +256,293 @@ function LearningSection({ audioRecords }) {
                     </Button>
                 )}
 
-                {/* Header with breadcrumb */}
+                {/* Breadcrumbs */}
                 <div style={styles.header}>
                     <div style={styles.breadcrumb}>
-                        <span style={styles.breadcrumbLink}>
-                            {selectedSystem === 'cardiology' ? 'Кардиология' : 'Пульмонология'}
-                        </span>
-                        <span> / </span>
-                        <span>{currentCategory?.name || 'Выберите категорию'}</span>
-                    </div>
-                    <Title level={3} style={{ margin: 0, color: '#0a2540' }}>
-                        {currentCategory?.name || 'Обучение'}
-                    </Title>
-                </div>
-
-                {/* Sub-filter chips */}
-                {subFilters.length > 0 && (
-                    <div style={styles.filterBar}>
-                        {subFilters.map((item) => (
-                            <Tag
-                                key={item.key}
-                                style={{
-                                    ...styles.filterChip,
-                                    ...(selectedSubFilter === item.key ? styles.filterChipActive : {})
-                                }}
-                                onClick={() => setSelectedSubFilter(item.key)}
-                            >
-                                {item.name}
-                            </Tag>
+                        {breadcrumbPath.map((node, index) => (
+                            <span key={node.key} style={{ display: 'flex', alignItems: 'center' }}>
+                                {index > 0 && <span style={styles.breadcrumbSeparator}>/</span>}
+                                {index === breadcrumbPath.length - 1 ? (
+                                    <span style={{ color: '#3c4257' }}>
+                                        {node.type === 'system' ? getSystemName(node.key) : node.name}
+                                    </span>
+                                ) : (
+                                    <span
+                                        style={styles.breadcrumbLink}
+                                        onClick={() => handleNodeSelect(node.key, selectedSystem)}
+                                        onMouseEnter={(e) => e.target.style.opacity = '0.7'}
+                                        onMouseLeave={(e) => e.target.style.opacity = '1'}
+                                    >
+                                        {node.type === 'system' ? getSystemName(node.key) : node.name}
+                                    </span>
+                                )}
+                            </span>
                         ))}
                     </div>
-                )}
+                </div>
 
-                {/* Content Grid */}
-                {filteredRecords.length === 0 ? (
-                    <Empty
-                        description="Нет записей в этой категории"
-                        style={{ marginTop: 64 }}
-                    />
-                ) : (
-                    <div style={{ display: 'flex', gap: 32 }}>
-                        {/* Cards List */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: 360, flexShrink: 0 }}>
-                            {filteredRecords.map((record) => (
-                                <SoundCard
-                                    key={record.id}
-                                    record={record}
-                                    isSelected={selectedAudio?.id === record.id}
-                                    onClick={() => setSelectedAudio(record)}
-                                />
-                            ))}
-                        </div>
+                {/* Content View */}
+                {(() => {
+                    // Check if current node has children (is a folder)
+                    const hasChildren = currentNode && (
+                        (currentNode.categories && currentNode.categories.length > 0) ||
+                        (currentNode.items && currentNode.items.length > 0) ||
+                        (currentNode.subtypes && currentNode.subtypes.length > 0)
+                    );
 
-                        {/* Description Panel */}
-                        {selectedAudio && (
-                            <div style={{
-                                flex: 1,
-                                padding: 24,
-                                background: '#fafbfc',
-                                borderRadius: 12,
-                                border: '1px solid #e3e8ee',
-                                alignSelf: 'flex-start'
-                            }}>
+                    // Get children array
+                    const getChildren = () => {
+                        if (!currentNode) return [];
+                        return [
+                            ...(currentNode.categories || []),
+                            ...(currentNode.items || []),
+                            ...(currentNode.subtypes || [])
+                        ];
+                    };
+
+                    // FOLDER VIEW: Show description + child navigation cards
+                    // If node has children, always show folder view (not audio records)
+                    if (hasChildren) {
+                        const children = getChildren();
+                        return (
+                            <div style={{ maxWidth: 900 }}>
+                                {/* Folder Title */}
+                                <Title level={2} style={{ marginTop: 0, marginBottom: 16, color: '#0a2540' }}>
+                                    {currentNode?.name || 'Раздел'}
+                                </Title>
+
+                                {/* Folder Description (from learning_nodes) */}
+                                {currentNode?.description && (
+                                    <div style={{
+                                        fontSize: 16,
+                                        lineHeight: 1.7,
+                                        color: '#3c4257',
+                                        marginBottom: 32,
+                                        padding: 20,
+                                        background: '#f8f9fa',
+                                        borderRadius: 8,
+                                        borderLeft: '4px solid #635bff'
+                                    }}>
+                                        {currentNode.description}
+                                    </div>
+                                )}
+
+                                {/* Child Navigation Cards */}
                                 <div style={{
-                                    fontSize: 11,
+                                    fontSize: 13,
                                     fontWeight: 600,
                                     color: '#8898aa',
                                     textTransform: 'uppercase',
                                     letterSpacing: '0.05em',
-                                    marginBottom: 12
+                                    marginBottom: 16
                                 }}>
-                                    Описание
+                                    Подразделы ({children.length})
                                 </div>
-                                <h4 style={{
-                                    fontSize: 16,
-                                    fontWeight: 600,
-                                    color: '#0a2540',
-                                    marginBottom: 12,
-                                    marginTop: 0
-                                }}>
-                                    {selectedAudio.name}
-                                </h4>
-                                <p style={{
-                                    fontSize: 14,
-                                    color: '#3c4257',
-                                    lineHeight: 1.7,
-                                    margin: 0
-                                }}>
-                                    {selectedAudio.description}
-                                </p>
 
-                                {/* Auscultation Point with Image */}
                                 <div style={{
-                                    marginTop: 24,
-                                    padding: 20,
-                                    background: '#fff',
-                                    borderRadius: 8,
-                                    border: '1px dashed #e3e8ee',
-                                    textAlign: 'center'
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                                    gap: 16
                                 }}>
-                                    {selectedAudio.imageUrl ? (
-                                        <img
-                                            src={selectedAudio.imageUrl}
-                                            alt={`Точка аускультации: ${selectedAudio.position}`}
+                                    {children.map((child) => (
+                                        <div
+                                            key={child.key}
+                                            onClick={() => handleNodeSelect(child.key, selectedSystem)}
+                                            className="stripe-card"
                                             style={{
-                                                maxWidth: '100%',
-                                                maxHeight: 300,
-                                                borderRadius: 8,
-                                                marginBottom: 12,
-                                                objectFit: 'contain'
+                                                padding: 20,
+                                                background: '#fff',
+                                                border: '1px solid #e3e8ee',
+                                                borderRadius: 12,
+                                                cursor: 'pointer'
                                             }}
-                                        />
-                                    ) : (
-                                        <div style={{ fontSize: 28, marginBottom: 8 }}>🩺</div>
-                                    )}
-                                    <div style={{ fontSize: 12, color: '#697386' }}>
-                                        Точка аускультации
-                                    </div>
-                                    <div style={{ fontSize: 13, color: '#0a2540', fontWeight: 500, marginTop: 4 }}>
-                                        {selectedAudio.position}
-                                    </div>
+                                        >
+                                            <div style={{
+                                                fontSize: 15,
+                                                fontWeight: 600,
+                                                color: '#0a2540',
+                                                marginBottom: 4
+                                            }}>
+                                                {child.name}
+                                            </div>
+                                            <div style={{
+                                                fontSize: 12,
+                                                color: '#8898aa'
+                                            }}>
+                                                →  Открыть
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
+                            </div>
+                        );
+                    }
 
-                                {/* Audio Player */}
-                                {selectedAudio.audioUrl && (
-                                    <div style={{ marginTop: 20 }}>
-                                        <AudioPlayer
-                                            audioUrl={selectedAudio.audioUrl}
-                                        />
+                    // LEAF VIEW: Node without children - show audio records directly
+                    if (currentNode && !hasChildren) {
+                        return (
+                            <div>
+                                {/* 1. Header: Topic Name from Node */}
+                                <Title level={2} style={{ marginTop: 0, marginBottom: 24, color: '#0a2540' }}>
+                                    {currentNode.name}
+                                </Title>
+
+                                {/* 2. Two-column layout: Description + Image */}
+                                {(currentNode.description || currentNode.image_url) && (
+                                    <div style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: currentNode.description && currentNode.image_url
+                                            ? '1fr 1fr'
+                                            : '1fr',
+                                        gap: 24,
+                                        marginBottom: 32,
+                                        alignItems: 'start'
+                                    }}>
+                                        {/* Description */}
+                                        {currentNode.description && (
+                                            <div className="description-block" style={{
+                                                fontSize: 15,
+                                                lineHeight: 1.7,
+                                                color: '#3c4257',
+                                                padding: 20,
+                                                background: '#f8f9fa',
+                                                borderRadius: 8,
+                                                borderLeft: '4px solid #635bff',
+                                                height: 'fit-content'
+                                            }}>
+                                                {currentNode.description}
+                                            </div>
+                                        )}
+
+                                        {/* Auscultation Image */}
+                                        {currentNode.image_url && (
+                                            <div style={{
+                                                background: '#fff',
+                                                border: '1px solid #e3e8ee',
+                                                borderRadius: 8,
+                                                padding: 16,
+                                                display: 'flex',
+                                                justifyContent: 'center',
+                                                alignItems: 'center'
+                                            }}>
+                                                <img
+                                                    src={currentNode.image_url}
+                                                    alt={currentNode.name}
+                                                    style={{
+                                                        maxWidth: '100%',
+                                                        maxHeight: 350,
+                                                        objectFit: 'contain',
+                                                        borderRadius: 4
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* 3. Audiogram from Node (above audio list) */}
+                                {currentNode.audiogram_url && (
+                                    <div style={{ marginBottom: 24 }}>
+                                        <div style={{
+                                            fontSize: 13,
+                                            fontWeight: 600,
+                                            color: '#8898aa',
+                                            textTransform: 'uppercase',
+                                            letterSpacing: '0.05em',
+                                            marginBottom: 12
+                                        }}>
+                                            Аудиограмма
+                                        </div>
+                                        <div style={{
+                                            background: '#fff',
+                                            border: '1px solid #e3e8ee',
+                                            borderRadius: 8,
+                                            padding: 16,
+                                            display: 'flex',
+                                            justifyContent: 'center',
+                                            alignItems: 'center'
+                                        }}>
+                                            <img
+                                                src={currentNode.audiogram_url}
+                                                alt="Аудиограмма"
+                                                style={{
+                                                    maxWidth: '100%',
+                                                    maxHeight: 120,
+                                                    objectFit: 'contain',
+                                                    borderRadius: 4
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 4. Audio List */}
+                                {filteredRecords.length > 0 ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                        <div style={{
+                                            fontSize: 13,
+                                            fontWeight: 600,
+                                            color: '#8898aa',
+                                            textTransform: 'uppercase',
+                                            letterSpacing: '0.05em',
+                                            marginBottom: 8
+                                        }}>
+                                            Аудиозаписи ({filteredRecords.length})
+                                        </div>
+
+                                        {filteredRecords.map((record) => (
+                                            <div
+                                                key={record.id}
+                                                className="audio-card"
+                                                style={{
+                                                    background: '#fff',
+                                                    border: '1px solid #e3e8ee',
+                                                    borderRadius: 12,
+                                                    padding: 20
+                                                }}
+                                            >
+                                                {/* Patient Info Header */}
+                                                <div style={{
+                                                    marginBottom: 12,
+                                                    fontSize: 14,
+                                                    fontWeight: 500,
+                                                    color: '#0a2540',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 8
+                                                }}>
+                                                    <span style={{ fontSize: 16 }}>👤</span>
+                                                    {record.position || 'Пациент'}
+                                                </div>
+
+                                                {/* Player */}
+                                                <AudioPlayer audioUrl={record.audioUrl} />
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div style={{
+                                        padding: 24,
+                                        background: '#fafbfc',
+                                        borderRadius: 8,
+                                        textAlign: 'center',
+                                        color: '#8898aa'
+                                    }}>
+                                        Аудиозаписи пока не добавлены
                                     </div>
                                 )}
                             </div>
-                        )}
-                    </div>
-                )}
+                        );
+                    }
+
+                    // Empty state
+                    return (
+                        <Empty
+                            description="Выберите тему или раздел для просмотра материалов"
+                            style={{ marginTop: 64 }}
+                        />
+                    );
+                })()}
             </div>
         </div>
     );

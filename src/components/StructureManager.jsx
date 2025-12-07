@@ -11,7 +11,8 @@ import {
     Tag,
     Checkbox,
     Tooltip,
-    Spin
+    Spin,
+    Upload
 } from 'antd';
 import {
     PlusOutlined,
@@ -22,12 +23,14 @@ import {
     DownOutlined,
     SoundOutlined,
     CheckCircleOutlined,
-    ExclamationCircleOutlined
+    ExclamationCircleOutlined,
+    UploadOutlined,
+    PictureOutlined
 } from '@ant-design/icons';
 import {
     getLearningNodes,
     addLearningNode,
-    updateLearningNode,
+    updateLearningNodeWithFiles,
     deleteLearningNode,
     addSound
 } from '../services/api';
@@ -80,6 +83,11 @@ function StructureManager({ audioRecords, onAudioUpdate }) {
     // Content Management State
     const [contentModalVisible, setContentModalVisible] = useState(false);
     const [selectedNodeForContent, setSelectedNodeForContent] = useState(null);
+
+    // File upload state for node editing
+    const [nodeImageFile, setNodeImageFile] = useState(null);
+    const [nodeAudiogramFile, setNodeAudiogramFile] = useState(null);
+    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         loadNodes();
@@ -217,8 +225,11 @@ function StructureManager({ audioRecords, onAudioUpdate }) {
     const handleEdit = (node) => {
         setEditingNode(node);
         setParentNodeForAdd(null);
+        setNodeImageFile(null);
+        setNodeAudiogramFile(null);
         form.setFieldsValue({
             name: node.name,
+            description: node.description || '',
             is_hidden: node.is_hidden,
             order: node.order
         });
@@ -250,15 +261,26 @@ function StructureManager({ audioRecords, onAudioUpdate }) {
     };
 
     const handleSave = async (values) => {
+        setSaving(true);
         try {
             if (editingNode) {
-                // Update
-                await updateLearningNode(editingNode.id, {
-                    name: values.name,
-                    is_hidden: values.is_hidden,
-                    order: values.order,
-                    parent_id: editingNode.parent_id
-                });
+                // Update with files if any were selected
+                await updateLearningNodeWithFiles(
+                    editingNode.id,
+                    {
+                        name: values.name,
+                        description: values.description || null,
+                        is_hidden: values.is_hidden,
+                        order: values.order,
+                        parent_id: editingNode.parent_id,
+                        image_url: editingNode.image_url,
+                        audiogram_url: editingNode.audiogram_url
+                    },
+                    nodeImageFile,
+                    nodeAudiogramFile
+                );
+                setNodeImageFile(null);
+                setNodeAudiogramFile(null);
                 message.success('Обновлено');
             } else {
                 // Create - автогенерация ключа и типа
@@ -288,6 +310,8 @@ function StructureManager({ audioRecords, onAudioUpdate }) {
         } catch (error) {
             console.error(error);
             message.error('Ошибка сохранения');
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -301,17 +325,17 @@ function StructureManager({ audioRecords, onAudioUpdate }) {
         }
     };
 
-    // Проверка полноты контента для узла
+    // Проверка полноты контента для узла - только проверяем наличие аудиозаписей
     const getContentStatus = (nodeKey) => {
         if (!audioRecords) return null;
-        const record = audioRecords.find(r => r.linkedNodeKey === nodeKey);
-        if (!record) return 'empty'; // Нет записи
+        const records = audioRecords.filter(r => r.linkedNodeKey === nodeKey);
 
-        const hasAudio = record.audioUrl && record.audioUrl !== '';
-        const hasImage = record.imageUrl && record.imageUrl !== '';
-        const hasDescription = record.description && record.description.trim() !== '';
+        if (records.length === 0) return 'empty'; // Нет записей
 
-        if (hasAudio && hasImage && hasDescription) return 'complete';
+        // Проверяем что у всех записей есть аудиофайл
+        const allHaveAudio = records.every(r => r.audioUrl && r.audioUrl !== '');
+
+        if (allHaveAudio) return 'complete';
         return 'incomplete';
     };
 
@@ -352,32 +376,55 @@ function StructureManager({ audioRecords, onAudioUpdate }) {
                             }
                             return null; // empty - no icon
                         })()}
+                        {/* Кнопка аудио - только для конечных узлов */}
                         {(!item.children || item.children.length === 0) && (
-                            <Tooltip title="Управление контентом (аудио)">
+                            <Tooltip title="🎵 Аудиозаписи">
                                 <Button
                                     size="small"
                                     icon={<SoundOutlined />}
                                     onClick={() => handleManageContent(item)}
-                                    style={{ color: '#1890ff', borderColor: '#1890ff' }}
+                                    style={{
+                                        background: '#e6f7ff',
+                                        borderColor: '#1890ff',
+                                        color: '#1890ff'
+                                    }}
                                 />
                             </Tooltip>
                         )}
-                        <Tooltip title="Редактировать">
+                        {/* Редактирование */}
+                        <Tooltip title="✏️ Редактировать (описание, картинка)">
                             <Button
                                 size="small"
                                 icon={<EditOutlined />}
                                 onClick={() => handleEdit(item)}
+                                style={{
+                                    background: '#fff7e6',
+                                    borderColor: '#ffa940',
+                                    color: '#fa8c16'
+                                }}
                             />
                         </Tooltip>
-                        <Tooltip title={`Добавить ${getTypeName(getChildType(item.type)).toLowerCase()}`}>
+                        {/* Добавить подпапку */}
+                        <Tooltip title={`➕ Добавить ${getTypeName(getChildType(item.type)).toLowerCase()}`}>
                             <Button
                                 size="small"
                                 icon={<PlusOutlined />}
                                 onClick={() => handleAdd(item)}
+                                style={{
+                                    background: '#f6ffed',
+                                    borderColor: '#52c41a',
+                                    color: '#52c41a'
+                                }}
                             />
                         </Tooltip>
+                        {/* Удалить */}
                         <Popconfirm title="Удалить?" onConfirm={() => handleDelete(item.id)}>
-                            <Button size="small" danger icon={<DeleteOutlined />} />
+                            <Button
+                                size="small"
+                                danger
+                                icon={<DeleteOutlined />}
+                                style={{ background: '#fff1f0' }}
+                            />
                         </Popconfirm>
                     </Space>
                 </div>
@@ -441,10 +488,12 @@ function StructureManager({ audioRecords, onAudioUpdate }) {
                         : `Добавить ${getTypeName(newNodeType).toLowerCase()}${parentNodeForAdd ? ` в "${parentNodeForAdd.name}"` : ''}`
                 }
                 open={isModalVisible}
-                onCancel={() => setIsModalVisible(false)}
+                onCancel={() => !saving && setIsModalVisible(false)}
                 onOk={form.submit}
-                okText={editingNode ? 'Сохранить' : 'Создать'}
+                okText={saving ? 'Сохранение...' : (editingNode ? 'Сохранить' : 'Создать')}
                 cancelText="Отмена"
+                confirmLoading={saving}
+                cancelButtonProps={{ disabled: saving }}
             >
                 <Form form={form} layout="vertical" onFinish={handleSave}>
                     <Form.Item
@@ -457,6 +506,71 @@ function StructureManager({ audioRecords, onAudioUpdate }) {
                             autoFocus
                         />
                     </Form.Item>
+
+                    {editingNode && (
+                        <Form.Item name="description" label="Описание раздела">
+                            <Input.TextArea
+                                rows={4}
+                                placeholder="Обобщающий текст для этой категории..."
+                            />
+                        </Form.Item>
+                    )}
+
+                    {/* Image Upload for editing */}
+                    {editingNode && (
+                        <Form.Item label="Изображение темы" style={{ marginBottom: 12 }}>
+                            {editingNode.image_url && !nodeImageFile && (
+                                <div style={{ marginBottom: 8 }}>
+                                    <img src={editingNode.image_url} alt="Изображение" style={{ height: 80, objectFit: 'contain', borderRadius: 4 }} />
+                                </div>
+                            )}
+                            {nodeImageFile && (
+                                <div style={{ marginBottom: 8, color: '#52c41a', fontSize: 12 }}>
+                                    ✓ Выбран файл: {nodeImageFile.name}
+                                </div>
+                            )}
+                            <Upload
+                                accept="image/*"
+                                beforeUpload={(file) => {
+                                    setNodeImageFile(file);
+                                    return false;
+                                }}
+                                showUploadList={false}
+                            >
+                                <Button icon={<PictureOutlined />}>
+                                    {editingNode.image_url ? 'Заменить' : 'Загрузить'} изображение
+                                </Button>
+                            </Upload>
+                        </Form.Item>
+                    )}
+
+                    {/* Audiogram Upload for editing */}
+                    {editingNode && (
+                        <Form.Item label="Аудиограмма (необязательно)" style={{ marginBottom: 12 }}>
+                            {editingNode.audiogram_url && !nodeAudiogramFile && (
+                                <div style={{ marginBottom: 8 }}>
+                                    <img src={editingNode.audiogram_url} alt="Аудиограмма" style={{ height: 60, objectFit: 'contain', borderRadius: 4 }} />
+                                </div>
+                            )}
+                            {nodeAudiogramFile && (
+                                <div style={{ marginBottom: 8, color: '#52c41a', fontSize: 12 }}>
+                                    ✓ Выбран файл: {nodeAudiogramFile.name}
+                                </div>
+                            )}
+                            <Upload
+                                accept="image/*"
+                                beforeUpload={(file) => {
+                                    setNodeAudiogramFile(file);
+                                    return false;
+                                }}
+                                showUploadList={false}
+                            >
+                                <Button icon={<UploadOutlined />}>
+                                    {editingNode.audiogram_url ? 'Заменить' : 'Загрузить'} аудиограмму
+                                </Button>
+                            </Upload>
+                        </Form.Item>
+                    )}
 
                     {editingNode && (
                         <Form.Item name="order" label="Порядок сортировки">
@@ -472,26 +586,73 @@ function StructureManager({ audioRecords, onAudioUpdate }) {
 
             {/* Content Management Modal */}
             <Modal
-                title={`Контент: ${selectedNodeForContent?.name || ''}`}
+                title={
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        color: '#0a2540'
+                    }}>
+                        <SoundOutlined style={{ color: '#1890ff' }} />
+                        <span>Аудиозаписи: <strong>{selectedNodeForContent?.name || ''}</strong></span>
+                    </div>
+                }
                 open={contentModalVisible}
                 onCancel={() => setContentModalVisible(false)}
                 footer={null}
-                width={800}
+                width={700}
             >
                 {selectedNodeForContent && (
-                    <>
-                        <AudioUploadForm
-                            onUploadSuccess={onAudioUpdate}
-                            initialNodeKey={selectedNodeForContent.key}
-                            initialNodeName={selectedNodeForContent.name}
-                        />
-                        <div style={{ marginTop: 24 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                        {/* Секция добавления */}
+                        <div style={{
+                            background: 'linear-gradient(135deg, #e6f7ff 0%, #f0f9ff 100%)',
+                            borderRadius: 12,
+                            padding: 20,
+                            border: '1px solid #91d5ff'
+                        }}>
+                            <div style={{
+                                fontSize: 14,
+                                fontWeight: 600,
+                                marginBottom: 16,
+                                color: '#0050b3',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8
+                            }}>
+                                ➕ Добавить новую аудиозапись
+                            </div>
+                            <AudioUploadForm
+                                onUploadSuccess={onAudioUpdate}
+                                initialNodeKey={selectedNodeForContent.key}
+                                initialNodeName={selectedNodeForContent.name}
+                            />
+                        </div>
+
+                        {/* Секция списка */}
+                        <div style={{
+                            background: '#fafbfc',
+                            borderRadius: 12,
+                            padding: 20,
+                            border: '1px solid #e3e8ee'
+                        }}>
+                            <div style={{
+                                fontSize: 14,
+                                fontWeight: 600,
+                                marginBottom: 16,
+                                color: '#0a2540',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8
+                            }}>
+                                📋 Существующие записи ({nodeAudioRecords.length})
+                            </div>
                             <AudioList
                                 audioRecords={nodeAudioRecords}
                                 onUpdate={onAudioUpdate}
                             />
                         </div>
-                    </>
+                    </div>
                 )}
             </Modal>
         </div>

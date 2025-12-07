@@ -34,6 +34,10 @@ export const buildLearningTree = (data) => {
                 // TopicTree expects subtypes to be strings or objects {name, ...}
                 // We'll keep it as object
                 parent.subtypes.push(child);
+            } else if (parent.type === 'subtype') {
+                // Вложенные подтипы тоже добавляем в subtypes родителя
+                if (!parent.subtypes) parent.subtypes = [];
+                parent.subtypes.push(child);
             }
         } else {
             // Only systems should be at root usually, or orphans

@@ -3,10 +3,14 @@ import { Button, Slider } from 'antd';
 import { PlayCircleOutlined, PauseCircleOutlined, SoundOutlined } from '@ant-design/icons';
 import WaveSurfer from 'wavesurfer.js';
 
+// Уникальный ID для каждого плеера
+let playerIdCounter = 0;
+
 function AudioPlayer({ audioUrl }) {
   const containerRef = useRef(null);
   const waveformRef = useRef(null);
   const wavesurfer = useRef(null);
+  const playerId = useRef(++playerIdCounter);
   const [playing, setPlaying] = useState(false);
   const [volume, setVolume] = useState(80);
 
@@ -31,16 +35,34 @@ function AudioPlayer({ audioUrl }) {
     });
 
     wavesurfer.current.on('click', () => {
+      // Останавливаем другие плееры
+      window.dispatchEvent(new CustomEvent('stopOtherPlayers', { detail: playerId.current }));
       wavesurfer.current.play();
       setPlaying(true);
     });
 
     wavesurfer.current.on('finish', () => setPlaying(false));
 
-    return () => wavesurfer.current?.destroy();
+    // Слушаем событие остановки от других плееров
+    const handleStopOther = (e) => {
+      if (e.detail !== playerId.current && wavesurfer.current) {
+        wavesurfer.current.pause();
+        setPlaying(false);
+      }
+    };
+    window.addEventListener('stopOtherPlayers', handleStopOther);
+
+    return () => {
+      window.removeEventListener('stopOtherPlayers', handleStopOther);
+      wavesurfer.current?.destroy();
+    };
   }, [audioUrl]);
 
   const togglePlay = () => {
+    if (!playing) {
+      // Останавливаем другие плееры перед воспроизведением
+      window.dispatchEvent(new CustomEvent('stopOtherPlayers', { detail: playerId.current }));
+    }
     wavesurfer.current?.playPause();
     setPlaying(p => !p);
   };
@@ -63,10 +85,9 @@ function AudioPlayer({ audioUrl }) {
         maxWidth: '100%'
       }}
     >
-      {/* Контейнер с ограниченной шириной и прокруткой */}
+      {/* Контейнер волны на полную ширину */}
       <div style={{
         width: '100%',
-        maxWidth: 400,
         overflow: 'hidden',
         borderRadius: 4
       }}>

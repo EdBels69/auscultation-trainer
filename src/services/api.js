@@ -37,7 +37,9 @@ export async function getSounds(forceRefresh = false) {
             imageUrl: item.image_url,
             fileName: item.file_name,
             createdAt: item.created_at,
-            linkedNodeKey: item.linked_node_key
+            createdAt: item.created_at,
+            linkedNodeKey: item.linked_node_key,
+            audiogramUrl: item.audiogram_url
         };
     });
 
@@ -49,7 +51,8 @@ export async function getSounds(forceRefresh = false) {
 }
 
 // Add a new sound with audio file and optional image
-export async function addSound(soundData, file, imageFile = null) {
+// Add a new sound with audio file and optional image and audiogram
+export async function addSound(soundData, file, imageFile = null, audiogramFile = null) {
     // Sanitize filename - remove non-ASCII characters
     const sanitizeFileName = (name) => {
         const ext = name.split('.').pop();
@@ -88,6 +91,25 @@ export async function addSound(soundData, file, imageFile = null) {
         }
     }
 
+    // 3. Upload audiogram file if provided
+    let audiogramUrl = null;
+    if (audiogramFile) {
+        const safeAudiogramName = sanitizeFileName(audiogramFile.name);
+        const audiogramPath = `${Date.now()}_AG_${safeAudiogramName}`;
+        const { error: agError } = await supabase.storage
+            .from('sounds')
+            .upload(audiogramPath, audiogramFile);
+
+        if (agError) {
+            console.error('Audiogram upload error:', agError);
+        } else {
+            const { data: { publicUrl: agUrl } } = supabase.storage
+                .from('sounds')
+                .getPublicUrl(audiogramPath);
+            audiogramUrl = agUrl;
+        }
+    }
+
     // 3. Insert record into DB
     const { data, error: dbError } = await supabase
         .from('sounds')
@@ -99,6 +121,8 @@ export async function addSound(soundData, file, imageFile = null) {
             file_path: filePath,
             file_name: file.name,
             image_url: imageUrl,
+            image_url: imageUrl,
+            audiogram_url: audiogramUrl,
             linked_node_key: soundData.linked_node_key
         })
         .select()
@@ -137,7 +161,8 @@ export async function updateSound(id, updates) {
 }
 
 // Update a sound with optional new audio/image files
-export async function updateSoundWithFile(id, updates, audioFile = null, imageFile = null, oldFilePath = null) {
+// Update a sound with optional new audio/image/audiogram files
+export async function updateSoundWithFile(id, updates, audioFile = null, imageFile = null, audiogramFile = null, oldFilePath = null) {
     // Sanitize filename helper
     const sanitizeFileName = (name) => {
         const ext = name.split('.').pop();
@@ -148,6 +173,7 @@ export async function updateSoundWithFile(id, updates, audioFile = null, imageFi
 
     let newFilePath = oldFilePath;
     let newImageUrl = updates.image_url || null;
+    let newAudiogramUrl = updates.audiogram_url || null;
 
     // Upload new audio file if provided
     if (audioFile) {
@@ -183,6 +209,23 @@ export async function updateSoundWithFile(id, updates, audioFile = null, imageFi
         }
     }
 
+    // Upload new audiogram file if provided
+    if (audiogramFile) {
+        const safeAudiogramName = sanitizeFileName(audiogramFile.name);
+        const audiogramPath = `${Date.now()}_AG_${safeAudiogramName}`;
+
+        const { error: agError } = await supabase.storage
+            .from('sounds')
+            .upload(audiogramPath, audiogramFile);
+
+        if (!agError) {
+            const { data: { publicUrl } } = supabase.storage
+                .from('sounds')
+                .getPublicUrl(audiogramPath);
+            newAudiogramUrl = publicUrl;
+        }
+    }
+
     // Update database record
     const { data, error } = await supabase
         .from('sounds')
@@ -193,7 +236,9 @@ export async function updateSoundWithFile(id, updates, audioFile = null, imageFi
             position: updates.position,
             file_path: newFilePath,
             file_name: audioFile ? audioFile.name : updates.file_name,
+            file_name: audioFile ? audioFile.name : updates.file_name,
             image_url: newImageUrl,
+            audiogram_url: newAudiogramUrl,
             linked_node_key: updates.linked_node_key
         })
         .eq('id', id)
@@ -311,4 +356,85 @@ export async function deleteLearningNode(id) {
         .eq('id', id);
 
     if (error) throw error;
+}
+
+// Update learning node with optional file uploads
+export async function updateLearningNodeWithFiles(id, nodeData, imageFile, audiogramFile) {
+    let imageUrl = nodeData.image_url;
+    let audiogramUrl = nodeData.audiogram_url;
+
+    // Upload image if provided
+    if (imageFile) {
+        try {
+            const fileExt = imageFile.name.split('.').pop();
+            const fileName = `node_${id}_image_${Date.now()}.${fileExt}`;
+            const filePath = `images/${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('sounds')
+                .upload(filePath, imageFile, { upsert: true });
+
+            if (uploadError) {
+                console.error('Image upload error:', uploadError);
+                throw uploadError;
+            }
+
+            const { data: urlData } = supabase.storage
+                .from('sounds')
+                .getPublicUrl(filePath);
+
+            imageUrl = urlData.publicUrl;
+        } catch (err) {
+            console.error('Image upload failed:', err);
+            throw new Error('Ошибка загрузки изображения: ' + err.message);
+        }
+    }
+
+    // Upload audiogram if provided
+    if (audiogramFile) {
+        try {
+            const fileExt = audiogramFile.name.split('.').pop();
+            const fileName = `node_${id}_audiogram_${Date.now()}.${fileExt}`;
+            const filePath = `audiograms/${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('sounds')
+                .upload(filePath, audiogramFile, { upsert: true });
+
+            if (uploadError) {
+                console.error('Audiogram upload error:', uploadError);
+                throw uploadError;
+            }
+
+            const { data: urlData } = supabase.storage
+                .from('sounds')
+                .getPublicUrl(filePath);
+
+            audiogramUrl = urlData.publicUrl;
+        } catch (err) {
+            console.error('Audiogram upload failed:', err);
+            throw new Error('Ошибка загрузки аудиограммы: ' + err.message);
+        }
+    }
+
+    // Update node in database
+    const { data, error } = await supabase
+        .from('learning_nodes')
+        .update({
+            name: nodeData.name,
+            description: nodeData.description,
+            is_hidden: nodeData.is_hidden,
+            order: nodeData.order,
+            image_url: imageUrl,
+            audiogram_url: audiogramUrl
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+    if (error) {
+        console.error('Node update error:', error);
+        throw error;
+    }
+    return data;
 }
