@@ -14,7 +14,7 @@ import './AIQuizSection.css';
 const { Title, Text, Paragraph } = Typography;
 
 // n8n webhook URL
-const N8N_WEBHOOK_URL = 'https://n8n-usi.ru/webhook-test/4ac6c045-41c3-48b7-8d33-2c98a800d479';
+const N8N_WEBHOOK_URL = 'https://n8n-usi.ru/webhook/4ac6c045-41c3-48b7-8d33-2c98a800d479';
 
 function AIQuizSection() {
     const [loading, setLoading] = useState(false);
