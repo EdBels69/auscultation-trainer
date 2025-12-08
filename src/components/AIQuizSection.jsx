@@ -34,6 +34,23 @@ function AIQuizSection() {
         setLoading(true);
         setError(null);
 
+        // Helper function to try to fix common JSON errors from AI
+        const tryParseJSON = (str) => {
+            try {
+                return JSON.parse(str);
+            } catch (e) {
+                // Try to fix common errors like missing quotes
+                try {
+                    // Fix patterns like {"id: "b" -> {"id": "b"
+                    const fixed = str.replace(/\{"id:\s*"/g, '{"id": "');
+                    return JSON.parse(fixed);
+                } catch (e2) {
+                    console.error('Failed to parse JSON even after fix attempt:', e2);
+                    return null;
+                }
+            }
+        };
+
         try {
             const response = await fetch(N8N_WEBHOOK_URL, {
                 method: 'POST',
@@ -66,9 +83,11 @@ function AIQuizSection() {
             else if (data.output) {
                 try {
                     const parsed = typeof data.output === 'string'
-                        ? JSON.parse(data.output)
+                        ? tryParseJSON(data.output)
                         : data.output;
-                    parsedQuestions = parsed.questions || (Array.isArray(parsed) ? parsed : []);
+                    if (parsed) {
+                        parsedQuestions = parsed.questions || (Array.isArray(parsed) ? parsed : []);
+                    }
                 } catch (e) {
                     console.error('Failed to parse output:', e);
                 }
