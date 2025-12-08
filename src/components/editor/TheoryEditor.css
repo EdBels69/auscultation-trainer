@@ -1,0 +1,333 @@
+/* ===== COMPACT AUDIO BLOCK ===== */
+.audio-block-wrapper {
+    margin: 8px 0;
+    display: inline-block;
+}
+
+.audio-block {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: white;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.25);
+    max-width: 400px;
+}
+
+.audio-block-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.audio-block-image {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    object-fit: cover;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.audio-block-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.audio-block-icon {
+    font-size: 14px;
+}
+
+.audio-block-name {
+    font-weight: 500;
+    font-size: 12px;
+    max-width: 120px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.audio-block-player {
+    width: 180px;
+    height: 28px;
+    border-radius: 4px;
+}
+
+.audio-block-player::-webkit-media-controls-panel {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+}
+
+/* ===== Sound Picker Modal ===== */
+.sound-picker-search {
+    margin-bottom: 16px;
+}
+
+.sound-picker-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.sound-picker-item {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid #e8e8e8;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.sound-picker-item:hover {
+    border-color: #667eea;
+    background: #f5f7ff;
+}
+
+.sound-picker-item-image {
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    object-fit: cover;
+    margin-right: 12px;
+    background: #f0f0f0;
+}
+
+.sound-picker-item-info {
+    flex: 1;
+}
+
+.sound-picker-item-name {
+    font-weight: 600;
+    margin-bottom: 2px;
+    font-size: 13px;
+}
+
+.sound-picker-item-category {
+    font-size: 11px;
+    color: #888;
+}
+
+.sound-picker-item-preview {
+    margin-left: auto;
+}
+
+/* ===== Theory Editor Toolbar ===== */
+.theory-editor-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 10px 12px;
+    background: linear-gradient(to bottom, #fafafa, #f5f5f5);
+    border: 1px solid #e0e0e0;
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    align-items: center;
+    row-gap: 8px;
+}
+
+.theory-editor-toolbar .ant-btn {
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+}
+
+.theory-editor-toolbar .ant-btn-sm {
+    height: 28px;
+    font-size: 12px;
+}
+
+.theory-editor-toolbar .ant-btn.is-active {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+
+.theory-editor-toolbar .ant-select {
+    min-width: 100px;
+}
+
+.theory-editor-toolbar .ant-select-sm .ant-select-selector {
+    height: 28px !important;
+}
+
+.theory-editor-divider {
+    width: 1px;
+    height: 20px;
+    background: #ddd;
+    margin: 0 6px;
+    align-self: center;
+}
+
+/* ===== Editor Content Area ===== */
+.theory-editor-content {
+    border: 1px solid #e0e0e0;
+    border-radius: 0 0 8px 8px;
+    min-height: 400px;
+    padding: 16px 20px;
+    background: #fff;
+}
+
+.theory-editor-content .ProseMirror {
+    outline: none;
+    min-height: 350px;
+}
+
+.theory-editor-content .ProseMirror p {
+    margin: 0 0 0.8em 0;
+}
+
+.theory-editor-content .ProseMirror h1 {
+    font-size: 26px;
+    font-weight: 700;
+    margin: 1.2em 0 0.4em 0;
+    color: #1a1a2e;
+}
+
+.theory-editor-content .ProseMirror h2 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 1em 0 0.4em 0;
+    color: #2d2d44;
+}
+
+.theory-editor-content .ProseMirror h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0.9em 0 0.3em 0;
+    color: #3d3d55;
+}
+
+.theory-editor-content .ProseMirror h4 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0.8em 0 0.3em 0;
+    color: #4d4d66;
+}
+
+.theory-editor-content .ProseMirror ul,
+.theory-editor-content .ProseMirror ol {
+    padding-left: 24px;
+    margin: 0.5em 0;
+}
+
+.theory-editor-content .ProseMirror blockquote {
+    border-left: 3px solid #667eea;
+    padding-left: 12px;
+    margin: 0.8em 0;
+    color: #555;
+    font-style: italic;
+}
+
+.theory-editor-content .ProseMirror img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    margin: 0.8em 0;
+}
+
+.theory-editor-content .ProseMirror a {
+    color: #667eea;
+    text-decoration: underline;
+}
+
+.theory-editor-content .ProseMirror hr {
+    border: none;
+    border-top: 2px solid #e8e8e8;
+    margin: 1.5em 0;
+}
+
+.theory-editor-content .ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    color: #adb5bd;
+    pointer-events: none;
+    height: 0;
+}
+
+/* ===== Theory Viewer Styles ===== */
+.theory-viewer {
+    line-height: 1.7;
+    font-size: 15px;
+}
+
+.theory-viewer h1 {
+    font-size: 26px;
+    font-weight: 700;
+    margin: 1.2em 0 0.4em 0;
+    color: #1a1a2e;
+}
+
+.theory-viewer h2 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 1em 0 0.4em 0;
+    color: #2d2d44;
+}
+
+.theory-viewer h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0.9em 0 0.3em 0;
+    color: #3d3d55;
+}
+
+.theory-viewer h4 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0.8em 0 0.3em 0;
+    color: #4d4d66;
+}
+
+.theory-viewer p {
+    margin: 0 0 0.8em 0;
+}
+
+.theory-viewer ul,
+.theory-viewer ol {
+    padding-left: 24px;
+    margin: 0.5em 0;
+}
+
+.theory-viewer blockquote {
+    border-left: 3px solid #667eea;
+    padding: 8px 12px;
+    margin: 0.8em 0;
+    color: #555;
+    font-style: italic;
+    background: #f8f9ff;
+    border-radius: 0 6px 6px 0;
+}
+
+.theory-viewer img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    margin: 0.8em 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.theory-viewer a {
+    color: #667eea;
+    text-decoration: underline;
+}
+
+.theory-viewer a:hover {
+    color: #764ba2;
+}
+
+.theory-viewer hr {
+    border: none;
+    border-top: 2px solid #e8e8e8;
+    margin: 1.5em 0;
+}
+
+/* Video/GIF support */
+.theory-viewer video,
+.theory-editor-content .ProseMirror video {
+    max-width: 100%;
+    border-radius: 6px;
+    margin: 0.8em 0;
+}

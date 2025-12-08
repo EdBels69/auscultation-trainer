@@ -252,6 +252,9 @@ input,
 
 .ant-tree .ant-tree-switcher {
   color: #8792a2 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .ant-tree .ant-tree-indent-unit {
