@@ -9,7 +9,7 @@
 
 **Интерактивное веб-приложение для обучения аускультации сердца и лёгких**
 
-[🚀 Демо](https://audiotrainerv1.netlify.app) · [📖 Документация](#использование) · [🐛 Сообщить об ошибке](https://github.com/yourusername/auscultation-trainer/issues)
+[🚀 Демо](https://auscultation-trainer.netlify.app/) · [📖 Документация](#использование) · [🐛 Сообщить об ошибке](https://github.com/yourusername/auscultation-trainer/issues)
 
 </div>
 
