@@ -8,8 +8,10 @@ const { Content } = Layout;
 // Lazy load sections for better performance
 const LearningSection = lazy(() => import('./components/LearningSection'));
 const TestSection = lazy(() => import('./components/TestSection'));
+const AIQuizSection = lazy(() => import('./components/AIQuizSection'));
 const AdminPanel = lazy(() => import('./components/AdminPanel'));
 const TheorySection = lazy(() => import('./components/TheorySection'));
+
 
 function App() {
   const [currentSection, setCurrentSection] = useState('learning');
@@ -97,6 +99,12 @@ function App() {
         return (
           <Suspense fallback={<LoadingFallback />}>
             <TestSection audioRecords={audioRecords} />
+          </Suspense>
+        );
+      case 'aiquiz':
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <AIQuizSection />
           </Suspense>
         );
       case 'admin':

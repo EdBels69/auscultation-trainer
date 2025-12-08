@@ -1,5 +1,5 @@
 import { Layout, Menu, Typography } from 'antd';
-import { BookOutlined, FileTextOutlined, SettingOutlined, ReadOutlined } from '@ant-design/icons';
+import { BookOutlined, FileTextOutlined, SettingOutlined, ReadOutlined, RobotOutlined } from '@ant-design/icons';
 
 const { Header } = Layout;
 const { Title } = Typography;
@@ -9,6 +9,7 @@ function Navigation({ currentSection, onSectionChange }) {
         { key: 'learning', label: 'Обучение', icon: <BookOutlined /> },
         { key: 'theory', label: 'Теория', icon: <ReadOutlined /> },
         { key: 'test', label: 'Тест', icon: <FileTextOutlined /> },
+        { key: 'aiquiz', label: 'AI Квиз', icon: <RobotOutlined /> },
         { key: 'admin', label: 'Управление', icon: <SettingOutlined /> },
     ];
 

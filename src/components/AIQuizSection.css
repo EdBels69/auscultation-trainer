@@ -1,0 +1,122 @@
+.ai-quiz-section {
+    padding: 32px 0;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.ai-quiz-start-card,
+.ai-quiz-results-card,
+.ai-quiz-question-card {
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.ai-quiz-intro {
+    text-align: center;
+    padding: 16px 0;
+}
+
+.ai-quiz-settings {
+    background: #f5f5f5;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+/* Results */
+.results-header {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.trophy-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+}
+
+.trophy-icon.passed {
+    color: #52c41a;
+}
+
+.trophy-icon.failed {
+    color: #faad14;
+}
+
+.results-stats {
+    margin-bottom: 32px;
+}
+
+/* Question */
+.quiz-progress-header {
+    margin-bottom: 24px;
+}
+
+.quiz-progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.question-header {
+    margin-bottom: 16px;
+}
+
+/* Quiz options */
+.quiz-option {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    border: 1px solid #d9d9d9;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    background: #fff;
+}
+
+.quiz-option:hover:not([class*="correct"]):not([class*="incorrect"]) {
+    border-color: #1890ff;
+    background: #f0f7ff;
+}
+
+.quiz-option.correct {
+    background: #f6ffed;
+    border-color: #52c41a;
+}
+
+.quiz-option.incorrect {
+    background: #fff2f0;
+    border-color: #ff4d4f;
+}
+
+.option-text {
+    flex: 1;
+}
+
+.option-icon {
+    font-size: 18px;
+    margin-left: 8px;
+}
+
+.option-icon.correct {
+    color: #52c41a;
+}
+
+.option-icon.incorrect {
+    color: #ff4d4f;
+}
+
+/* Audiogram */
+.audiogram-container {
+    margin-top: 16px;
+    padding: 16px;
+    background: #fafafa;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.audiogram-image {
+    max-width: 100%;
+    max-height: 300px;
+    margin-top: 8px;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
