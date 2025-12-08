@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Image from '@tiptap/extension-image';
+import ImageExtension from './ImageExtension';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import Underline from '@tiptap/extension-underline';
@@ -82,9 +82,7 @@ function TheoryEditor({ initialContent = '', onSave, saving = false }) {
             StarterKit.configure({
                 heading: { levels: [1, 2, 3, 4] },
             }),
-            Image.configure({
-                HTMLAttributes: { class: 'theory-image' },
-            }),
+            ImageExtension,
             Link.configure({ openOnClick: false }),
             Placeholder.configure({
                 placeholder: 'Начните писать...',
