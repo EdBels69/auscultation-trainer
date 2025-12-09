@@ -14,7 +14,7 @@ import './AIQuizSection.css';
 const { Title, Text, Paragraph } = Typography;
 
 // n8n webhook URL
-const N8N_WEBHOOK_URL = 'https://n8n-usi.ru/webhook/4ac6c045-41c3-48b7-8d33-2c98a800d479';
+const N8N_WEBHOOK_URL = 'https://n8n-usi.ru/webhook-test/4ac6c045-41c3-48b7-8d33-2c98a800d479';
 
 function AIQuizSection() {
     const [loading, setLoading] = useState(false);
@@ -28,6 +28,7 @@ function AIQuizSection() {
     const [results, setResults] = useState(null);
     const [questionCount, setQuestionCount] = useState(5);
     const [category, setCategory] = useState('all');
+    const [difficulty, setDifficulty] = useState('low');
     const audioRef = useRef(null);
 
     const generateQuiz = async () => {
@@ -59,7 +60,8 @@ function AIQuizSection() {
                 },
                 body: JSON.stringify({
                     count: questionCount,
-                    category: category === 'all' ? null : category
+                    category: category,
+                    difficulty: difficulty
                 })
             });
 
@@ -254,6 +256,18 @@ function AIQuizSection() {
                                             { value: 'all', label: 'Все звуки' },
                                             { value: 'cardiac', label: 'Сердце' },
                                             { value: 'pulmonary', label: 'Лёгкие' },
+                                        ]}
+                                    />
+                                </div>
+                                <div>
+                                    <Text strong>Сложность:</Text>
+                                    <Select
+                                        value={difficulty}
+                                        onChange={setDifficulty}
+                                        style={{ width: '100%', marginTop: 8 }}
+                                        options={[
+                                            { value: 'low', label: 'Лёгкий' },
+                                            { value: 'hard', label: 'Сложный' },
                                         ]}
                                     />
                                 </div>

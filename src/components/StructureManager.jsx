@@ -37,6 +37,7 @@ import {
 import { learningStructure } from '../data/learningStructure';
 import AudioUploadForm from './AudioUploadForm';
 import AudioList from './AudioList';
+import IconPicker, { renderIconByName } from './IconPicker';
 
 // Helper: транслитерация русского текста в латиницу для генерации ключа
 const transliterate = (text) => {
@@ -88,6 +89,10 @@ function StructureManager({ audioRecords, onAudioUpdate }) {
     const [nodeImageFile, setNodeImageFile] = useState(null);
     const [nodeAudiogramFile, setNodeAudiogramFile] = useState(null);
     const [saving, setSaving] = useState(false);
+
+    // Icon Picker state
+    const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
+    const [selectedIcon, setSelectedIcon] = useState(null);
 
     useEffect(() => {
         loadNodes();
@@ -227,6 +232,7 @@ function StructureManager({ audioRecords, onAudioUpdate }) {
         setParentNodeForAdd(null);
         setNodeImageFile(null);
         setNodeAudiogramFile(null);
+        setSelectedIcon(node.icon || null);
         form.setFieldsValue({
             name: node.name,
             description: node.description || '',
@@ -234,6 +240,10 @@ function StructureManager({ audioRecords, onAudioUpdate }) {
             order: node.order
         });
         setIsModalVisible(true);
+    };
+
+    const handleIconSelect = (icon) => {
+        setSelectedIcon(icon);
     };
 
     const handleDelete = async (id) => {
@@ -274,13 +284,15 @@ function StructureManager({ audioRecords, onAudioUpdate }) {
                         order: values.order,
                         parent_id: editingNode.parent_id,
                         image_url: editingNode.image_url,
-                        audiogram_url: editingNode.audiogram_url
+                        audiogram_url: editingNode.audiogram_url,
+                        icon: selectedIcon
                     },
                     nodeImageFile,
                     nodeAudiogramFile
                 );
                 setNodeImageFile(null);
                 setNodeAudiogramFile(null);
+                setSelectedIcon(null);
                 message.success('Обновлено');
             } else {
                 // Create - автогенерация ключа и типа
@@ -344,14 +356,18 @@ function StructureManager({ audioRecords, onAudioUpdate }) {
             title: (
                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: 10, alignItems: 'center' }}>
                     <span>
-                        {item.type === 'system' && '🫁/❤️ '}
-                        {item.type === 'category' && <FolderOutlined />}
-                        {(item.type === 'item' || item.type === 'subtype') && (
-                            item.children && item.children.length > 0
-                                ? <FolderOutlined />
-                                : <FileTextOutlined />
+                        {item.icon ? (
+                            <span style={{ marginRight: 6 }}>{renderIconByName(item.icon, { fontSize: 16 })}</span>
+                        ) : (
+                            <>
+                                {item.type === 'category' && <FolderOutlined style={{ marginRight: 6 }} />}
+                                {(item.type === 'item' || item.type === 'subtype') && (
+                                    item.children && item.children.length > 0
+                                        ? <FolderOutlined style={{ marginRight: 6 }} />
+                                        : <FileTextOutlined style={{ marginRight: 6 }} />
+                                )}
+                            </>
                         )}
-                        {' '}
                         <span style={item.is_hidden ? { color: '#ccc', textDecoration: 'line-through' } : {}}>
                             {item.name}
                         </span>
@@ -496,6 +512,30 @@ function StructureManager({ audioRecords, onAudioUpdate }) {
                 cancelButtonProps={{ disabled: saving }}
             >
                 <Form form={form} layout="vertical" onFinish={handleSave}>
+                    {/* Icon picker for editing */}
+                    {editingNode && (
+                        <Form.Item label="Иконка раздела">
+                            <Button
+                                onClick={() => setIsIconPickerOpen(true)}
+                                style={{
+                                    height: 48,
+                                    minWidth: 80,
+                                    fontSize: 24,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 8
+                                }}
+                            >
+                                {selectedIcon ? (
+                                    renderIconByName(selectedIcon, { fontSize: 24 })
+                                ) : (
+                                    <span style={{ color: '#bbb' }}>Выбрать иконку</span>
+                                )}
+                            </Button>
+                        </Form.Item>
+                    )}
+
                     <Form.Item
                         name="name"
                         label="Название"
@@ -583,6 +623,14 @@ function StructureManager({ audioRecords, onAudioUpdate }) {
                     </Form.Item>
                 </Form>
             </Modal>
+
+            {/* Icon Picker Modal */}
+            <IconPicker
+                visible={isIconPickerOpen}
+                onClose={() => setIsIconPickerOpen(false)}
+                onSelect={handleIconSelect}
+                currentIcon={selectedIcon}
+            />
 
             {/* Content Management Modal */}
             <Modal
