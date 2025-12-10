@@ -95,12 +95,9 @@ function TopicTree({ onSelect, selectedCategory, systems = [] }) {
         // Get icon for systems
         const getSystemIcon = () => {
             if (!isSystem) return null;
-            const iconBg = node.key === 'cardiology'
-                ? 'linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%)'
-                : 'linear-gradient(135deg, #635bff 0%, #00d4ff 100%)';
             const iconEmoji = node.key === 'cardiology' ? '❤️' : '🫁';
             return (
-                <span style={{ ...styles.systemIcon, background: iconBg }}>
+                <span style={{ fontSize: 18 }}>
                     {iconEmoji}
                 </span>
             );
