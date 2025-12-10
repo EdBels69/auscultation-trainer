@@ -1,16 +1,25 @@
 import { useState, useEffect } from 'react';
-import { Button, Typography, Spin, Tabs } from 'antd';
+import { Button, Typography, Spin, Tabs, Switch, Card, Space } from 'antd';
 import { supabase, signOut } from '../services/supabase';
 import { getSounds } from '../services/api';
 import StructureManager from './StructureManager';
 import TheoryManager from './TheoryManager';
 import AdminLogin from './AdminLogin';
+import { BugOutlined, RocketOutlined } from '@ant-design/icons';
 
 const { Title } = Typography;
 
 function AdminPanel({ audioRecords, onAudioRecordsUpdate }) {
     const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [isTestMode, setIsTestMode] = useState(() => {
+        return localStorage.getItem('webhookTestMode') === 'true';
+    });
+
+    const handleWebhookModeChange = (checked) => {
+        setIsTestMode(checked);
+        localStorage.setItem('webhookTestMode', checked.toString());
+    };
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -58,6 +67,32 @@ function AdminPanel({ audioRecords, onAudioRecordsUpdate }) {
             key: '2',
             label: 'Теория',
             children: <TheoryManager />,
+        },
+        {
+            key: '3',
+            label: 'Настройки',
+            children: (
+                <Card title="Настройки квиза" style={{ maxWidth: 500 }}>
+                    <Space direction="vertical" size="middle">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <Switch
+                                checked={isTestMode}
+                                onChange={handleWebhookModeChange}
+                                checkedChildren={<BugOutlined />}
+                                unCheckedChildren={<RocketOutlined />}
+                            />
+                            <span>
+                                {isTestMode ? (
+                                    <><BugOutlined style={{ color: '#faad14' }} /> Тестовый режим (webhook-test)</>) : (
+                                    <><RocketOutlined style={{ color: '#52c41a' }} /> Продакшн (webhook)</>)}
+                            </span>
+                        </div>
+                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                            Тестовый режим использует webhook-test для отладки в n8n
+                        </Typography.Text>
+                    </Space>
+                </Card>
+            ),
         },
     ];
 

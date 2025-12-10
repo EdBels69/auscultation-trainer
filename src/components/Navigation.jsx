@@ -9,7 +9,7 @@ function Navigation({ currentSection, onSectionChange }) {
         { key: 'learning', label: 'Обучение', icon: <BookOutlined /> },
         { key: 'theory', label: 'Теория', icon: <ReadOutlined /> },
         { key: 'test', label: 'Тест', icon: <FileTextOutlined /> },
-        { key: 'aiquiz', label: 'AI Квиз', icon: <RobotOutlined /> },
+        { key: 'aiquiz', label: 'Квиз', icon: <RobotOutlined /> },
         { key: 'admin', label: 'Управление', icon: <SettingOutlined /> },
     ];
 

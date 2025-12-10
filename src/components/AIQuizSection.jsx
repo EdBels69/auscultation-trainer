@@ -13,8 +13,14 @@ import './AIQuizSection.css';
 
 const { Title, Text, Paragraph } = Typography;
 
-// n8n webhook URL
-const N8N_WEBHOOK_URL = 'https://n8n-usi.ru/webhook-test/4ac6c045-41c3-48b7-8d33-2c98a800d479';
+// n8n webhook URLs
+const WEBHOOK_TEST_URL = 'https://n8n-usi.ru/webhook-test/4ac6c045-41c3-48b7-8d33-2c98a800d479';
+const WEBHOOK_PROD_URL = 'https://n8n-usi.ru/webhook/4ac6c045-41c3-48b7-8d33-2c98a800d479';
+
+const getWebhookUrl = () => {
+    const isTestMode = localStorage.getItem('webhookTestMode') === 'true';
+    return isTestMode ? WEBHOOK_TEST_URL : WEBHOOK_PROD_URL;
+};
 
 function AIQuizSection() {
     const [loading, setLoading] = useState(false);
@@ -35,15 +41,26 @@ function AIQuizSection() {
         setLoading(true);
         setError(null);
 
+        // Helper function to strip markdown code blocks
+        const stripMarkdown = (str) => {
+            if (typeof str !== 'string') return str;
+            // Remove ```json ... ``` or ``` ... ``` wrappers
+            const match = str.match(/```(?:json)?\s*([\s\S]*?)```/);
+            return match ? match[1].trim() : str;
+        };
+
         // Helper function to try to fix common JSON errors from AI
         const tryParseJSON = (str) => {
             try {
-                return JSON.parse(str);
+                // First strip markdown if present
+                const cleanStr = stripMarkdown(str);
+                return JSON.parse(cleanStr);
             } catch (e) {
                 // Try to fix common errors like missing quotes
                 try {
+                    const cleanStr = stripMarkdown(str);
                     // Fix patterns like {"id: "b" -> {"id": "b"
-                    const fixed = str.replace(/\{"id:\s*"/g, '{"id": "');
+                    const fixed = cleanStr.replace(/\{"id:\s*"/g, '{"id": "');
                     return JSON.parse(fixed);
                 } catch (e2) {
                     console.error('Failed to parse JSON even after fix attempt:', e2);
@@ -53,7 +70,7 @@ function AIQuizSection() {
         };
 
         try {
-            const response = await fetch(N8N_WEBHOOK_URL, {
+            const response = await fetch(getWebhookUrl(), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -142,8 +159,8 @@ function AIQuizSection() {
                 throw new Error('Не удалось получить вопросы от AI');
             }
         } catch (err) {
-            console.error('Quiz generation error:', err);
-            setError(err.message || 'Ошибка при генерации квиза');
+            console.error('Quiz generation error:', err.message || err);
+            setError('Извините, раздел в разработке');
         } finally {
             setLoading(false);
         }
@@ -217,15 +234,15 @@ function AIQuizSection() {
         return (
             <div className="ai-quiz-section">
                 <Title level={2}>
-                    <RobotOutlined /> AI Квиз
+                    <RobotOutlined /> Квиз
                 </Title>
 
                 <Card className="ai-quiz-start-card">
                     <Space direction="vertical" size="large" style={{ width: '100%' }}>
                         <div className="ai-quiz-intro">
-                            <Title level={4}>Тестирование с AI</Title>
+                            <Title level={4}>Тестирование</Title>
                             <Paragraph type="secondary">
-                                Вопросы генерируются искусственным интеллектом на основе
+                                Вопросы генерируются на основе
                                 реальных звуков аускультации из нашей базы данных.
                             </Paragraph>
                         </div>
@@ -293,7 +310,7 @@ function AIQuizSection() {
                             icon={<RobotOutlined />}
                             block
                         >
-                            {loading ? 'AI генерирует вопросы...' : 'Сгенерировать квиз'}
+                            {loading ? 'Генерация вопросов...' : 'Сгенерировать квиз'}
                         </Button>
                     </Space>
                 </Card>
@@ -305,7 +322,7 @@ function AIQuizSection() {
     if (testCompleted && results) {
         return (
             <div className="ai-quiz-section">
-                <Title level={2}>Результаты AI Квиза</Title>
+                <Title level={2}>Результаты квиза</Title>
 
                 <Card className="ai-quiz-results-card">
                     <div className="results-header">
@@ -352,7 +369,7 @@ function AIQuizSection() {
                         {results.passed ? (
                             <Alert
                                 message="Отличная работа!"
-                                description="Вы успешно прошли AI-тест."
+                                description="Вы успешно прошли тест."
                                 type="success"
                                 showIcon
                             />
@@ -372,7 +389,7 @@ function AIQuizSection() {
                                 onClick={generateQuiz}
                                 icon={<RobotOutlined />}
                             >
-                                Новый AI квиз
+                                Новый квиз
                             </Button>
                             <Button
                                 size="large"
