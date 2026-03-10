@@ -1,0 +1,55 @@
+name: Build & Deploy to Beget
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_ADMIN_PASSWORD: ${{ secrets.VITE_ADMIN_PASSWORD }}
+        run: npm run build
+
+      - name: Create .htaccess for SPA routing
+        run: |
+          cat > dist/.htaccess << 'EOF'
+          Options -MultiViews
+          RewriteEngine On
+          RewriteBase /
+          RewriteCond %{REQUEST_FILENAME} !-f
+          RewriteCond %{REQUEST_FILENAME} !-d
+          RewriteRule ^ index.html [QSA,L]
+          EOF
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H edbels9i.beget.tech >> ~/.ssh/known_hosts
+
+      - name: Deploy via rsync over SSH
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            ./dist/ \
+            edbels9i_auscultationtrainer@edbels9i.beget.tech:~/edbels9i.beget.tech/public_html/
