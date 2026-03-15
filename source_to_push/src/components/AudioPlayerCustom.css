@@ -1,0 +1,55 @@
+/* Custom styles for react-h5-audio-player */
+.rhap_container {
+  background-color: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.rhap_main {
+  flex-direction: row !important;
+}
+
+.rhap_progress-section {
+  flex: 1 !important;
+}
+
+.rhap_controls-section {
+  margin-right: var(--spacing-md) !important;
+}
+
+.rhap_main-controls button {
+  color: var(--color-primary) !important;
+  width: 36px !important;
+  height: 36px !important;
+}
+
+.rhap_main-controls button:hover {
+  color: var(--color-accent) !important;
+}
+
+.rhap_progress-bar {
+  background-color: var(--color-bg-tertiary) !important;
+  height: 4px !important;
+}
+
+.rhap_progress-filled,
+.rhap_progress-indicator {
+  background-color: var(--color-accent) !important;
+}
+
+.rhap_time {
+  color: var(--color-text-secondary) !important;
+  font-size: var(--font-size-xs) !important;
+}
+
+.rhap_volume-button {
+  color: var(--color-text-secondary) !important;
+}
+
+.rhap_volume-bar {
+  background: var(--color-bg-tertiary) !important;
+}
+
+.rhap_volume-indicator {
+  background: var(--color-accent) !important;
+}
