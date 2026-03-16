@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Modal, Form, Input, Button, Tabs, Select, message, Alert } from 'antd';
 import { UserOutlined, LockOutlined, MailOutlined, BankOutlined } from '@ant-design/icons';
-import { signIn, signUp } from '../services/supabase';
+import { signIn, signUp, resetPassword } from '../services/supabase';
 
 const ROLE_OPTIONS = [
     { value: 'student',  label: 'Студент' },
@@ -13,8 +13,11 @@ const ROLE_OPTIONS = [
 function AuthModal({ open, onClose, onSuccess }) {
     const [activeTab, setActiveTab] = useState('login');
     const [loading, setLoading] = useState(false);
+    const [showReset, setShowReset] = useState(false);
+    const [resetSent, setResetSent] = useState(false);
     const [loginForm] = Form.useForm();
     const [registerForm] = Form.useForm();
+    const [resetForm] = Form.useForm();
 
     const handleLogin = async (values) => {
         setLoading(true);
@@ -26,6 +29,17 @@ function AuthModal({ open, onClose, onSuccess }) {
             loginForm.resetFields();
             onSuccess?.();
             onClose();
+        }
+        setLoading(false);
+    };
+
+    const handleResetPassword = async (values) => {
+        setLoading(true);
+        try {
+            await resetPassword(values.email);
+            setResetSent(true);
+        } catch (err) {
+            message.error(err.message || 'Ошибка отправки письма');
         }
         setLoading(false);
     };
@@ -54,7 +68,52 @@ function AuthModal({ open, onClose, onSuccess }) {
         {
             key: 'login',
             label: 'Вход',
-            children: (
+            children: showReset ? (
+                <div>
+                    {resetSent ? (
+                        <Alert
+                            message="Письмо отправлено!"
+                            description={`Проверьте почту — там будет ссылка для сброса пароля. Если не видите письмо, проверьте папку «Спам».`}
+                            type="success"
+                            showIcon
+                            style={{ marginBottom: 16 }}
+                        />
+                    ) : (
+                        <>
+                            <Alert
+                                message="Восстановление пароля"
+                                description="Введите email — пришлём ссылку для сброса пароля."
+                                type="info"
+                                showIcon
+                                style={{ marginBottom: 16 }}
+                            />
+                            <Form form={resetForm} onFinish={handleResetPassword} layout="vertical">
+                                <Form.Item
+                                    name="email"
+                                    rules={[
+                                        { required: true, message: 'Введите Email' },
+                                        { type: 'email', message: 'Некорректный Email' }
+                                    ]}
+                                >
+                                    <Input prefix={<MailOutlined />} placeholder="Ваш email" size="large" />
+                                </Form.Item>
+                                <Form.Item>
+                                    <Button type="primary" htmlType="submit" block size="large" loading={loading}>
+                                        Отправить ссылку
+                                    </Button>
+                                </Form.Item>
+                            </Form>
+                        </>
+                    )}
+                    <Button
+                        type="link"
+                        block
+                        onClick={() => { setShowReset(false); setResetSent(false); resetForm.resetFields(); }}
+                    >
+                        ← Вернуться ко входу
+                    </Button>
+                </div>
+            ) : (
                 <Form form={loginForm} onFinish={handleLogin} layout="vertical">
                     <Form.Item
                         name="email"
@@ -76,6 +135,11 @@ function AuthModal({ open, onClose, onSuccess }) {
                             Войти
                         </Button>
                     </Form.Item>
+                    <div style={{ textAlign: 'center' }}>
+                        <Button type="link" onClick={() => setShowReset(true)} style={{ padding: 0 }}>
+                            Забыл пароль?
+                        </Button>
+                    </div>
                 </Form>
             )
         },
@@ -180,10 +244,17 @@ function AuthModal({ open, onClose, onSuccess }) {
         }
     ];
 
+    const handleClose = () => {
+        setShowReset(false);
+        setResetSent(false);
+        resetForm.resetFields();
+        onClose();
+    };
+
     return (
         <Modal
             open={open}
-            onCancel={onClose}
+            onCancel={handleClose}
             footer={null}
             width={460}
             centered
