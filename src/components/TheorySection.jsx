@@ -11,11 +11,12 @@ import {
 import TheoryViewer from './TheoryViewer';
 import { renderIconByName } from './IconPicker';
 import { getTheoryNodes } from '../services/api';
+import { checkTheoryAchievement, notifyAchievements } from '../services/achievements';
 
 const { Sider, Content } = Layout;
 const { Title, Paragraph } = Typography;
 
-function TheorySection() {
+function TheorySection({ user }) {
     const [nodes, setNodes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedNode, setSelectedNode] = useState(null);
@@ -25,7 +26,13 @@ function TheorySection() {
 
     useEffect(() => {
         loadNodes();
-    }, []);
+        // Award theory_reader badge on first visit
+        if (user?.id) {
+            checkTheoryAchievement(user.id).then(awarded => {
+                if (awarded.length > 0) notifyAchievements(message, awarded);
+            });
+        }
+    }, [user?.id]);
 
     const loadNodes = async () => {
         try {

@@ -9,18 +9,10 @@ import {
     RobotOutlined,
     SoundOutlined
 } from '@ant-design/icons';
+import { generateQuizQuestions } from '../services/ai';
 import './AIQuizSection.css';
 
 const { Title, Text, Paragraph } = Typography;
-
-// n8n webhook URLs
-const WEBHOOK_TEST_URL = 'https://n8n-usi.ru/webhook-test/4ac6c045-41c3-48b7-8d33-2c98a800d479';
-const WEBHOOK_PROD_URL = 'https://n8n-usi.ru/webhook/4ac6c045-41c3-48b7-8d33-2c98a800d479';
-
-const getWebhookUrl = () => {
-    const isTestMode = localStorage.getItem('webhookTestMode') === 'true';
-    return isTestMode ? WEBHOOK_TEST_URL : WEBHOOK_PROD_URL;
-};
 
 function AIQuizSection() {
     const [loading, setLoading] = useState(false);
@@ -34,118 +26,40 @@ function AIQuizSection() {
     const [results, setResults] = useState(null);
     const [questionCount, setQuestionCount] = useState(5);
     const [category, setCategory] = useState('all');
-    const [difficulty, setDifficulty] = useState('low');
+    const [difficulty, setDifficulty] = useState('medium');
     const audioRef = useRef(null);
 
     const generateQuiz = async () => {
         setLoading(true);
         setError(null);
 
-        // Helper function to strip markdown code blocks
-        const stripMarkdown = (str) => {
-            if (typeof str !== 'string') return str;
-            // Remove ```json ... ``` or ``` ... ``` wrappers
-            const match = str.match(/```(?:json)?\s*([\s\S]*?)```/);
-            return match ? match[1].trim() : str;
-        };
-
-        // Helper function to try to fix common JSON errors from AI
-        const tryParseJSON = (str) => {
-            try {
-                // First strip markdown if present
-                const cleanStr = stripMarkdown(str);
-                return JSON.parse(cleanStr);
-            } catch (e) {
-                // Try to fix common errors like missing quotes
-                try {
-                    const cleanStr = stripMarkdown(str);
-                    // Fix patterns like {"id: "b" -> {"id": "b"
-                    const fixed = cleanStr.replace(/\{"id:\s*"/g, '{"id": "');
-                    return JSON.parse(fixed);
-                } catch (e2) {
-                    console.error('Failed to parse JSON even after fix attempt:', e2);
-                    return null;
-                }
-            }
-        };
-
         try {
-            const response = await fetch(getWebhookUrl(), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    count: questionCount,
-                    category: category,
-                    difficulty: difficulty
-                })
+            // Use OpenRouter/DeepSeek directly — no n8n dependency
+            const rawQuestions = await generateQuizQuestions({
+                count: questionCount,
+                category,
+                difficulty,
             });
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            // Debug: log what we received
-            console.log('n8n response:', JSON.stringify(data, null, 2));
-
-            // Parse different response formats from n8n
-            let parsedQuestions = [];
-
-            // Format 1: { questions: [...] }
-            if (data.questions && Array.isArray(data.questions)) {
-                parsedQuestions = data.questions;
-            }
-            // Format 2: { output: { questions: [...] } } or { output: "[...]" }
-            else if (data.output) {
-                try {
-                    const parsed = typeof data.output === 'string'
-                        ? tryParseJSON(data.output)
-                        : data.output;
-                    if (parsed) {
-                        parsedQuestions = parsed.questions || (Array.isArray(parsed) ? parsed : []);
-                    }
-                } catch (e) {
-                    console.error('Failed to parse output:', e);
-                }
-            }
-            // Format 3: Array with output objects - [{ output: { questions: [...] } }]
-            else if (Array.isArray(data) && data.length > 0) {
-                // Check if first item has output
-                if (data[0]?.output) {
-                    data.forEach(item => {
-                        const output = item.output;
-                        if (output?.questions && Array.isArray(output.questions)) {
-                            parsedQuestions.push(...output.questions);
-                        }
-                    });
-                }
-                // Or direct array of questions
-                else if (data[0]?.question) {
-                    parsedQuestions = data;
-                }
-            }
-
-            console.log('Parsed questions:', parsedQuestions);
-
-            // Normalize question format (handle is_correct vs isCorrect, string booleans)
-            const normalizedQuestions = parsedQuestions.map((q, index) => ({
-                id: q.id || index + 1,
-                question: q.question,
-                audio_url: q.audio_url || q.audioUrl,
-                audiogram_url: (q.audiogram_url === 'null' || q.audiogram_url === null) ? null : q.audiogram_url,
-                explanation: q.explanation || q.topic || '',
-                options: (q.options || []).map((opt, optIndex) => ({
-                    id: opt.id || String.fromCharCode(97 + optIndex),
-                    text: opt.text,
-                    // Handle string booleans "true"/"false" and actual booleans
-                    isCorrect: opt.isCorrect === true || opt.isCorrect === 'true' ||
-                        opt.is_correct === true || opt.is_correct === 'true',
-                    audio_url: opt.audio_url
-                }))
-            }));
+            // Convert from AI format {options: {a,b,c,d}, correct_answer: "a"}
+            // to internal format {options: [{id, text, isCorrect}]}
+            const normalizedQuestions = rawQuestions.map((q, index) => {
+                const optionsObj = q.options || {};
+                const correctKey = (q.correct_answer || '').toLowerCase();
+                return {
+                    id: q.id || `q${index + 1}`,
+                    question: q.question,
+                    audio_url: null,
+                    audiogram_url: null,
+                    explanation: q.explanation || '',
+                    options: Object.entries(optionsObj).map(([key, text]) => ({
+                        id: key,
+                        text: String(text),
+                        isCorrect: key === correctKey,
+                        audio_url: null,
+                    })),
+                };
+            });
 
             if (normalizedQuestions.length > 0) {
                 setQuestions(normalizedQuestions);
@@ -283,8 +197,9 @@ function AIQuizSection() {
                                         onChange={setDifficulty}
                                         style={{ width: '100%', marginTop: 8 }}
                                         options={[
-                                            { value: 'low', label: 'Лёгкий' },
-                                            { value: 'hard', label: 'Сложный' },
+                                            { value: 'easy', label: 'Базовый (1-2 курс)' },
+                                            { value: 'medium', label: 'Средний (3-5 курс)' },
+                                            { value: 'hard', label: 'Продвинутый (ординатура)' },
                                         ]}
                                     />
                                 </div>

@@ -5,7 +5,8 @@ import { getSounds } from '../services/api';
 import StructureManager from './StructureManager';
 import TheoryManager from './TheoryManager';
 import AdminLogin from './AdminLogin';
-import { BugOutlined, RocketOutlined } from '@ant-design/icons';
+import AdminStats from './AdminStats';
+import { BugOutlined, RocketOutlined, BarChartOutlined } from '@ant-design/icons';
 
 const { Title } = Typography;
 
@@ -69,6 +70,11 @@ function AdminPanel({ audioRecords, onAudioRecordsUpdate }) {
             children: <TheoryManager />,
         },
         {
+            key: 'stats',
+            label: <><BarChartOutlined /> Дашборд НИР</>,
+            children: <AdminStats />,
+        },
+        {
             key: '3',
             label: 'Настройки',
             children: (
@@ -84,11 +90,14 @@ function AdminPanel({ audioRecords, onAudioRecordsUpdate }) {
                             <span>
                                 {isTestMode ? (
                                     <><BugOutlined style={{ color: '#faad14' }} /> Тестовый режим (webhook-test)</>) : (
-                                    <><RocketOutlined style={{ color: '#52c41a' }} /> Продакшн (webhook)</>)}
+                                    <><RocketOutlined style={{ color: '#52c41a' }} /> Продакшн (OpenRouter/DeepSeek)</>)}
                             </span>
                         </div>
                         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                            Тестовый режим использует webhook-test для отладки в n8n
+                            ИИ-квиз теперь работает напрямую через OpenRouter API (DeepSeek). n8n не используется.
+                        </Typography.Text>
+                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                            Чтобы сменить модель — измените значение MODEL в src/services/ai.js
                         </Typography.Text>
                     </Space>
                 </Card>

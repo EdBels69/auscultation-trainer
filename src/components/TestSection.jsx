@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Card, Button, Radio, Typography, Progress, Space, Alert, Statistic, Row, Col } from 'antd';
+import { Card, Button, Radio, Typography, Progress, Space, Alert, Statistic, Row, Col, Select, message as antMessage } from 'antd';
 import {
     PlayCircleOutlined,
     CheckCircleOutlined,
@@ -8,10 +8,19 @@ import {
     ReloadOutlined
 } from '@ant-design/icons';
 import { generateTest, calculateResults } from '../utils/testGenerator';
+import { supabase } from '../services/supabase';
+import { checkTestAchievements, notifyAchievements } from '../services/achievements';
 
 const { Title, Text, Paragraph } = Typography;
 
-function TestSection({ audioRecords }) {
+const SESSION_TYPES = [
+    { value: 'practice', label: 'Практика (без записи)' },
+    { value: 'T1', label: 'T1 — Исходный уровень' },
+    { value: 'T2', label: 'T2 — После обучения' },
+    { value: 'T3', label: 'T3 — Отсроченный контроль' },
+];
+
+function TestSection({ audioRecords, user }) {
     const [testStarted, setTestStarted] = useState(false);
     const [questions, setQuestions] = useState([]);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -19,6 +28,8 @@ function TestSection({ audioRecords }) {
     const [showExplanation, setShowExplanation] = useState(false);
     const [testCompleted, setTestCompleted] = useState(false);
     const [results, setResults] = useState(null);
+    const [sessionType, setSessionType] = useState('practice');
+    const [startTime, setStartTime] = useState(null);
     const audioRef = useRef(null);
 
     const minRecordsRequired = 5;
@@ -32,6 +43,7 @@ function TestSection({ audioRecords }) {
         setShowExplanation(false);
         setTestCompleted(false);
         setResults(null);
+        setStartTime(Date.now());
         setTestStarted(true);
     };
 
@@ -52,10 +64,39 @@ function TestSection({ audioRecords }) {
         }
     };
 
-    const finishTest = () => {
+    const finishTest = async () => {
         const testResults = calculateResults(questions, userAnswers);
         setResults(testResults);
         setTestCompleted(true);
+
+        // Save to Supabase if logged in
+        if (user) {
+            const durationSec = startTime ? Math.round((Date.now() - startTime) / 1000) : null;
+            const answersPayload = questions.map((q, i) => ({
+                question: q.question,
+                audio_url: q.audioUrl,
+                user_answer: userAnswers[i] ?? null,
+                correct_answer: q.correctAnswerId,
+                is_correct: userAnswers[i] === q.correctAnswerId,
+            }));
+
+            const { error } = await supabase.from('test_sessions').insert({
+                user_id: user.id,
+                session_type: sessionType,
+                score: testResults.score,
+                total_q: testResults.total,
+                correct_q: testResults.correct,
+                duration_sec: durationSec,
+                answers: answersPayload,
+            });
+
+            if (!error) {
+                const awarded = await checkTestAchievements(user.id, testResults.score);
+                if (awarded.length > 0) notifyAchievements(antMessage, awarded);
+            } else {
+                console.error('Error saving test session:', error);
+            }
+        }
     };
 
     const playAudio = () => {
@@ -96,6 +137,20 @@ function TestSection({ audioRecords }) {
                                 • Вы можете прослушать каждый звук несколько раз
                             </Paragraph>
                         </div>
+                        {user && (
+                            <div>
+                                <Text strong style={{ display: 'block', marginBottom: 8 }}>Тип сессии (НИР):</Text>
+                                <Select
+                                    value={sessionType}
+                                    onChange={setSessionType}
+                                    style={{ width: '100%' }}
+                                    options={SESSION_TYPES}
+                                />
+                                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
+                                    T1/T2/T3 — результат записывается в базу для НИР. Практика не сохраняется.
+                                </Text>
+                            </div>
+                        )}
                         <Button
                             type="primary"
                             size="large"

@@ -1,7 +1,10 @@
 import { useState, useEffect, memo, useCallback, useMemo, lazy, Suspense } from 'react';
 import { Layout, Spin, message } from 'antd';
 import Navigation from './components/Navigation';
+import ResetPasswordModal from './components/ResetPasswordModal';
+import AuthModal from './components/AuthModal';
 import { getSounds } from './services/api';
+import { supabase } from './services/supabase';
 
 const { Content } = Layout;
 
@@ -11,12 +14,40 @@ const TestSection = lazy(() => import('./components/TestSection'));
 const AIQuizSection = lazy(() => import('./components/AIQuizSection'));
 const AdminPanel = lazy(() => import('./components/AdminPanel'));
 const TheorySection = lazy(() => import('./components/TheorySection'));
+const SurveySection = lazy(() => import('./components/SurveySection'));
+const ProfileSection = lazy(() => import('./components/ProfileSection'));
 
 
 function App() {
   const [currentSection, setCurrentSection] = useState('learning');
   const [audioRecords, setAudioRecords] = useState([]);
-  const [loading, setLoading] = useState(false); // Don't block UI on initial load
+  const [loading, setLoading] = useState(false);
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [user, setUser] = useState(null);
+
+  // Detect mobile
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  // Track auth state (for regular users)
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      if (event === 'PASSWORD_RECOVERY') {
+        setShowPasswordReset(true);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Load records in background
   useEffect(() => {
@@ -92,19 +123,31 @@ function App() {
       case 'theory':
         return (
           <Suspense fallback={<LoadingFallback />}>
-            <TheorySection />
+            <TheorySection user={user} />
           </Suspense>
         );
       case 'test':
         return (
           <Suspense fallback={<LoadingFallback />}>
-            <TestSection audioRecords={audioRecords} />
+            <TestSection audioRecords={audioRecords} user={user} />
           </Suspense>
         );
       case 'aiquiz':
         return (
           <Suspense fallback={<LoadingFallback />}>
             <AIQuizSection />
+          </Suspense>
+        );
+      case 'surveys':
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <SurveySection user={user} />
+          </Suspense>
+        );
+      case 'profile':
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <ProfileSection user={user} />
           </Suspense>
         );
       case 'admin':
@@ -131,11 +174,33 @@ function App() {
       <Navigation
         currentSection={currentSection}
         onSectionChange={handleSectionChange}
+        user={user}
+        onAuthClick={() => setShowAuthModal(true)}
+        onSignOut={() => supabase.auth.signOut()}
       />
 
-      <Content style={{ padding: '0 50px', maxWidth: 1400, margin: '0 auto', width: '100%' }}>
+      <Content style={{
+        padding: isMobile ? '0 8px' : '0 24px',
+        maxWidth: 1400,
+        margin: '0 auto',
+        width: '100%',
+        boxSizing: 'border-box',
+      }}>
         {renderSection}
       </Content>
+
+      {/* Password reset modal — triggered by Supabase recovery link */}
+      <ResetPasswordModal
+        open={showPasswordReset}
+        onClose={() => setShowPasswordReset(false)}
+      />
+
+      {/* Auth modal for regular users */}
+      <AuthModal
+        open={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onAuthSuccess={() => setShowAuthModal(false)}
+      />
     </Layout>
   );
 }
