@@ -10,7 +10,9 @@ import {
     Space,
     Popconfirm,
     Switch,
-    Drawer
+    Drawer,
+    Tabs,
+    Tag
 } from 'antd';
 import {
     PlusOutlined,
@@ -39,6 +41,7 @@ function TheoryManager() {
     const [contentEditingNode, setContentEditingNode] = useState(null);
     const [selectedIcon, setSelectedIcon] = useState('FileTextOutlined');
     const [saving, setSaving] = useState(false);
+    const [contentLang, setContentLang] = useState('ru');
     const [form] = Form.useForm();
     const [expandedKeys, setExpandedKeys] = useState([]);
 
@@ -113,6 +116,7 @@ function TheoryManager() {
 
     const handleEditContent = (node) => {
         setContentEditingNode(node);
+        setContentLang('ru');
         setIsEditorOpen(true);
     };
 
@@ -148,8 +152,11 @@ function TheoryManager() {
 
         setSaving(true);
         try {
-            await updateTheoryNode(contentEditingNode.id, { content: html });
-            message.success('Содержимое сохранено');
+            const field = contentLang === 'en' ? 'content_en' : 'content';
+            await updateTheoryNode(contentEditingNode.id, { [field]: html });
+            message.success(contentLang === 'en' ? 'EN content saved' : 'Содержимое сохранено');
+            // Update local node so tab switch shows fresh content without reload
+            setContentEditingNode(prev => ({ ...prev, [field]: html }));
             loadNodes();
         } catch (error) {
             message.error('Ошибка сохранения');
@@ -379,6 +386,12 @@ function TheoryManager() {
                     <span>
                         <FormOutlined style={{ marginRight: 8 }} />
                         Редактор: {contentEditingNode?.title}
+                        <Tag
+                            color={contentLang === 'en' ? 'blue' : 'green'}
+                            style={{ marginLeft: 12, fontSize: 12 }}
+                        >
+                            {contentLang.toUpperCase()}
+                        </Tag>
                     </span>
                 }
                 placement="right"
@@ -388,11 +401,33 @@ function TheoryManager() {
                 destroyOnClose
             >
                 {contentEditingNode && (
-                    <TheoryEditor
-                        initialContent={contentEditingNode.content || ''}
-                        onSave={handleSaveContent}
-                        saving={saving}
-                    />
+                    <>
+                        <Tabs
+                            activeKey={contentLang}
+                            onChange={setContentLang}
+                            style={{ marginBottom: 0 }}
+                            items={[
+                                {
+                                    key: 'ru',
+                                    label: '🇷🇺 Русский',
+                                },
+                                {
+                                    key: 'en',
+                                    label: '🇬🇧 English',
+                                },
+                            ]}
+                        />
+                        <TheoryEditor
+                            key={contentLang}
+                            initialContent={
+                                contentLang === 'en'
+                                    ? (contentEditingNode.content_en || '')
+                                    : (contentEditingNode.content || '')
+                            }
+                            onSave={handleSaveContent}
+                            saving={saving}
+                        />
+                    </>
                 )}
             </Drawer>
         </div>
