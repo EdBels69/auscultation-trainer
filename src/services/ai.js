@@ -1,15 +1,14 @@
 /**
- * AI service — OpenRouter → DeepSeek Chat
- * Compatible model: deepseek/deepseek-chat
- * Fallback: deepseek/deepseek-r1 (slower but better reasoning)
+ * AI service — RouterAI → DeepSeek V3.2
+ * Endpoint: https://routerai.ru/api/v1 (OpenAI-compatible)
  */
 
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MODEL = 'deepseek/deepseek-chat';
+const ROUTERAI_URL = 'https://routerai.ru/api/v1/chat/completions';
+const MODEL = 'deepseek/deepseek-v3.2';
 const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://auscultation-trainer.ru';
 
 function getApiKey() {
-    return import.meta.env.VITE_OPENROUTER_API_KEY || '';
+    return import.meta.env.VITE_OPENROUTER_API_KEY || import.meta.env.VITE_AI_API_KEY || '';
 }
 
 /**
@@ -17,16 +16,14 @@ function getApiKey() {
  */
 async function chatCompletion(messages, options = {}) {
     const apiKey = getApiKey();
-    if (!apiKey || apiKey.startsWith('sk-or-REPLACE')) {
-        throw new Error('OpenRouter API ключ не настроен. Добавьте VITE_OPENROUTER_API_KEY в .env');
+    if (!apiKey) {
+        throw new Error('RouterAI API ключ не настроен. Добавьте VITE_OPENROUTER_API_KEY в .env');
     }
 
-    const response = await fetch(OPENROUTER_URL, {
+    const response = await fetch(ROUTERAI_URL, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${apiKey}`,
-            'HTTP-Referer': SITE_URL,
-            'X-Title': 'Auscultation Trainer',
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -39,7 +36,7 @@ async function chatCompletion(messages, options = {}) {
 
     if (!response.ok) {
         const err = await response.text();
-        throw new Error(`OpenRouter error ${response.status}: ${err}`);
+        throw new Error(`RouterAI error ${response.status}: ${err}`);
     }
 
     const data = await response.json();
