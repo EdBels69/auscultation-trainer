@@ -20,19 +20,28 @@ async function chatCompletion(messages, options = {}) {
         throw new Error('RouterAI API ключ не настроен. Добавьте VITE_OPENROUTER_API_KEY в .env');
     }
 
-    const response = await fetch(ROUTERAI_URL, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            model: options.model || MODEL,
-            messages,
-            temperature: options.temperature ?? 0.3,
-            max_tokens: options.max_tokens ?? 2000,
-        }),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45000);
+
+    let response;
+    try {
+        response = await fetch(ROUTERAI_URL, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model: options.model || MODEL,
+                messages,
+                temperature: options.temperature ?? 0.3,
+                max_tokens: options.max_tokens ?? 2000,
+            }),
+            signal: controller.signal,
+        });
+    } finally {
+        clearTimeout(timeout);
+    }
 
     if (!response.ok) {
         const err = await response.text();
@@ -51,8 +60,8 @@ async function chatCompletion(messages, options = {}) {
  * @returns {Promise<Array>} questions array
  */
 export async function generateQuizQuestions({ count = 5, category = 'all', difficulty = 'medium', soundRecords = [] }) {
-    const categoryLabel = category === 'cardiology' ? 'кардиологии (сердечные шумы, тоны)' :
-                          category === 'pulmonology' ? 'пульмонологии (дыхательные звуки)' :
+    const categoryLabel = category === 'cardiac' ? 'кардиологии (сердечные шумы, тоны)' :
+                          category === 'pulmonary' ? 'пульмонологии (дыхательные звуки)' :
                           'кардиологии и пульмонологии';
 
     const diffLabel = difficulty === 'easy' ? 'базового уровня (1-2 курс медвуза)' :
@@ -98,7 +107,7 @@ export async function generateQuizQuestions({ count = 5, category = 'all', diffi
     const content = await chatCompletion([
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
-    ], { temperature: 0.4, max_tokens: 3000 });
+    ], { temperature: 0.4, max_tokens: 2000 });
 
     // Parse JSON — strip markdown if present
     const jsonStr = content.replace(/```(?:json)?\s*([\s\S]*?)```/g, '$1').trim();
