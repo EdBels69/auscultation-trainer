@@ -4,6 +4,7 @@ import {
     BookOutlined, FileTextOutlined, SettingOutlined,
     ReadOutlined, RobotOutlined, MenuOutlined,
     UserOutlined, LogoutOutlined, FormOutlined, ProfileOutlined,
+    MessageOutlined,
 } from '@ant-design/icons';
 
 const { Header } = Layout;
@@ -32,6 +33,7 @@ function Navigation({ currentSection, onSectionChange, user, onAuthClick, onSign
         { key: 'theory', label: 'Теория', icon: <ReadOutlined /> },
         { key: 'test', label: 'Тест', icon: <FileTextOutlined /> },
         { key: 'aiquiz', label: 'ИИ-Квиз', icon: <RobotOutlined /> },
+        { key: 'chat', label: 'ИИ-Чат', icon: <MessageOutlined /> },
         { key: 'surveys', label: 'Анкеты', icon: <FormOutlined /> },
         { key: 'admin', label: 'Управление', icon: <SettingOutlined /> },
     ];

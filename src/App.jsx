@@ -16,6 +16,7 @@ const AdminPanel = lazy(() => import('./components/AdminPanel'));
 const TheorySection = lazy(() => import('./components/TheorySection'));
 const SurveySection = lazy(() => import('./components/SurveySection'));
 const ProfileSection = lazy(() => import('./components/ProfileSection'));
+const AIChatSection = lazy(() => import('./components/AIChatSection'));
 
 
 function App() {
@@ -136,6 +137,12 @@ function App() {
         return (
           <Suspense fallback={<LoadingFallback />}>
             <AIQuizSection />
+          </Suspense>
+        );
+      case 'chat':
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <AIChatSection user={user} />
           </Suspense>
         );
       case 'surveys':
