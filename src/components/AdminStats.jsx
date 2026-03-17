@@ -63,7 +63,7 @@ function AdminStats() {
         setLoading(true);
         try {
             const [sessRes, survRes, profRes] = await Promise.all([
-                supabase.from('test_sessions').select('*').order('completed_at', { ascending: false }),
+                supabase.from('test_sessions').select('*').order('created_at', { ascending: false }),
                 supabase.from('survey_responses').select('*').order('created_at', { ascending: false }),
                 supabase.from('profiles').select('*'),
             ]);
@@ -81,7 +81,7 @@ function AdminStats() {
     /* ── filtered data ─────────────────────────────────────────── */
     const filtered = dateRange
         ? sessions.filter(s => {
-            const d = new Date(s.completed_at);
+            const d = new Date(s.created_at);
             return d >= dateRange[0].toDate() && d <= dateRange[1].toDate();
         })
         : sessions;
@@ -196,7 +196,7 @@ function AdminStats() {
                     'Правильных': s.correct_q,
                     'Всего вопросов': s.total_q,
                     'Время (сек)': s.duration_sec,
-                    'Дата': new Date(s.completed_at).toLocaleString('ru'),
+                    'Дата': new Date(s.created_at).toLocaleString('ru'),
                 })),
             },
             {
