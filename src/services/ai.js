@@ -26,7 +26,7 @@ async function chatCompletion(messages, options = {}) {
         headers: {
             'Authorization': `Bearer ${apiKey}`,
             'HTTP-Referer': SITE_URL,
-            'X-Title': 'Аускультация — Цифровой тренажёр',
+            'X-Title': 'Auscultation Trainer',
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
