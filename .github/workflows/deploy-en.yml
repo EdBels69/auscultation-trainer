@@ -32,15 +32,15 @@ jobs:
           VITE_DEFAULT_LANG: en
         run: npm run build
 
-      - name: Create .htaccess for SPA routing
+      - name: Create .htaccess for SPA routing (subfolder /en/)
         run: |
           cat > dist/.htaccess << 'EOF'
           Options -MultiViews
           RewriteEngine On
-          RewriteBase /
+          RewriteBase /en/
           RewriteCond %{REQUEST_FILENAME} !-f
           RewriteCond %{REQUEST_FILENAME} !-d
-          RewriteRule ^ index.html [QSA,L]
+          RewriteRule ^ /en/index.html [QSA,L]
           EOF
 
       - name: Deploy to Beget via FTP (EN subdomain)
