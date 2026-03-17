@@ -101,6 +101,8 @@ function TheoryManager() {
         form.setFieldsValue({
             title: node.title,
             sidebar_title: node.sidebar_title,
+            title_en: node.title_en,
+            sidebar_title_en: node.sidebar_title_en,
             category: node.category,
             is_folder: node.is_folder,
             parent_id: node.parent_id
@@ -315,15 +317,25 @@ function TheoryManager() {
                 open={isModalVisible}
                 onCancel={() => setIsModalVisible(false)}
                 onOk={form.submit}
-                width={500}
+                width={600}
             >
                 <Form form={form} layout="vertical" onFinish={handleSave}>
-                    <Form.Item name="title" label="Полное название" rules={[{ required: true }]}>
+                    {/* RU Title */}
+                    <Form.Item name="title" label="Полное название (RU)" rules={[{ required: true }]}>
                         <Input placeholder="Полный заголовок статьи" />
                     </Form.Item>
 
-                    <Form.Item name="sidebar_title" label="Заголовок для сайдбара (краткий)">
+                    <Form.Item name="sidebar_title" label="Заголовок для сайдбара (RU)">
                         <Input placeholder="Короткое название для меню" maxLength={30} showCount />
+                    </Form.Item>
+
+                    {/* EN Title */}
+                    <Form.Item name="title_en" label="Full title (EN)">
+                        <Input placeholder="Full article title in English" />
+                    </Form.Item>
+
+                    <Form.Item name="sidebar_title_en" label="Sidebar title (EN)">
+                        <Input placeholder="Short English title for menu" maxLength={30} showCount />
                     </Form.Item>
 
                     <Form.Item label="Иконка">

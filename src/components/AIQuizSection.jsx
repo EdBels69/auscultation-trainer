@@ -10,11 +10,13 @@ import {
     SoundOutlined
 } from '@ant-design/icons';
 import { generateQuizQuestions } from '../services/ai';
+import { useLanguage, tx } from '../contexts/LanguageContext';
 import './AIQuizSection.css';
 
 const { Title, Text, Paragraph } = Typography;
 
 function AIQuizSection() {
+    const lang = useLanguage();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [testStarted, setTestStarted] = useState(false);
@@ -39,6 +41,7 @@ function AIQuizSection() {
                 count: questionCount,
                 category,
                 difficulty,
+                language: lang,
             });
 
             // Convert from AI format {options: {a,b,c,d}, correct_answer: "a"}

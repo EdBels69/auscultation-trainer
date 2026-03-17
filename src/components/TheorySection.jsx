@@ -12,11 +12,13 @@ import TheoryViewer from './TheoryViewer';
 import { renderIconByName } from './IconPicker';
 import { getTheoryNodes } from '../services/api';
 import { checkTheoryAchievement, notifyAchievements } from '../services/achievements';
+import { useLanguage, tx } from '../contexts/LanguageContext';
 
 const { Sider, Content } = Layout;
 const { Title, Paragraph } = Typography;
 
 function TheorySection({ user }) {
+    const lang = useLanguage();
     const [nodes, setNodes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedNode, setSelectedNode] = useState(null);
@@ -45,7 +47,7 @@ function TheorySection({ user }) {
             setExpandedKeys(rootKeys);
         } catch (error) {
             console.error(error);
-            message.error('Ошибка загрузки теории.');
+            message.error(tx(lang, 'Ошибка загрузки теории.', 'Error loading theory.'));
         } finally {
             setLoading(false);
         }
@@ -102,12 +104,14 @@ function TheorySection({ user }) {
                 icon = <FileTextOutlined style={{ ...iconStyle, color: '#52c41a' }} />;
             }
 
-            const menuTitle = node.sidebar_title || node.title;
+            // Use EN title if available and lang='en'
+            const displayTitle = lang === 'en' ? (node.title_en || node.title) : node.title;
+            const menuTitle = lang === 'en' ? (node.sidebar_title_en || node.sidebar_title || displayTitle) : (node.sidebar_title || displayTitle);
 
             return {
                 key: node.id,
                 title: (
-                    <span style={{ fontSize: 14 }} title={node.title}>
+                    <span style={{ fontSize: 14 }} title={displayTitle}>
                         {icon} <span style={{ marginLeft: 8 }}>{menuTitle}</span>
                     </span>
                 ),
@@ -157,7 +161,7 @@ function TheorySection({ user }) {
                     color: '#fff'
                 }}>
                     <BookOutlined style={{ fontSize: 24, marginRight: 12 }} />
-                    <span style={{ fontSize: 18, fontWeight: 600 }}>База знаний</span>
+                    <span style={{ fontSize: 18, fontWeight: 600 }}>{tx(lang, 'База знаний', 'Knowledge Base')}</span>
                 </div>
                 <div style={{
                     height: 'calc(100% - 72px)',
@@ -187,11 +191,11 @@ function TheorySection({ user }) {
                         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)'
                     }}>
                         <Title level={2} style={{ marginBottom: 24, color: '#1a1a2e' }}>
-                            {selectedNode.title}
+                            {lang === 'en' ? (selectedNode.title_en || selectedNode.title) : selectedNode.title}
                         </Title>
 
-                        {selectedNode.content ? (
-                            <TheoryViewer content={selectedNode.content} />
+                        {(lang === 'en' ? (selectedNode.content_en || selectedNode.content) : selectedNode.content) ? (
+                            <TheoryViewer content={lang === 'en' ? (selectedNode.content_en || selectedNode.content) : selectedNode.content} />
                         ) : (
                             <div style={{
                                 textAlign: 'center',

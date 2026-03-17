@@ -56,27 +56,69 @@ async function chatCompletion(messages, options = {}) {
 
 /**
  * Generate auscultation quiz questions
- * @param {object} params - { count, category, difficulty, soundRecords }
+ * @param {object} params - { count, category, difficulty, soundRecords, language }
  * @returns {Promise<Array>} questions array
  */
-export async function generateQuizQuestions({ count = 5, category = 'all', difficulty = 'medium', soundRecords = [] }) {
-    const categoryLabel = category === 'cardiac' ? 'кардиологии (сердечные шумы, тоны)' :
-                          category === 'pulmonary' ? 'пульмонологии (дыхательные звуки)' :
-                          'кардиологии и пульмонологии';
+export async function generateQuizQuestions({ count = 5, category = 'all', difficulty = 'medium', soundRecords = [], language = 'ru' }) {
+    const isEnglish = language === 'en';
 
-    const diffLabel = difficulty === 'easy' ? 'базового уровня (1-2 курс медвуза)' :
-                      difficulty === 'hard' ? 'продвинутого уровня (ординатура, врачи)' :
-                      'среднего уровня (3-5 курс медвуза)';
+    const categoryLabel = isEnglish
+        ? (category === 'cardiac' ? 'cardiology (heart sounds and murmurs)' :
+           category === 'pulmonary' ? 'pulmonology (breath sounds)' :
+           'cardiology and pulmonology')
+        : (category === 'cardiac' ? 'кардиологии (сердечные шумы, тоны)' :
+           category === 'pulmonary' ? 'пульмонологии (дыхательные звуки)' :
+           'кардиологии и пульмонологии');
+
+    const diffLabel = isEnglish
+        ? (difficulty === 'easy' ? 'basic level (1-2 year medical students)' :
+           difficulty === 'hard' ? 'advanced level (residents, doctors)' :
+           'intermediate level (3-5 year medical students)')
+        : (difficulty === 'easy' ? 'базового уровня (1-2 курс медвуза)' :
+           difficulty === 'hard' ? 'продвинутого уровня (ординатура, врачи)' :
+           'среднего уровня (3-5 курс медвуза)');
 
     // Include real sound names from DB for context-aware questions
     const soundContext = soundRecords.length > 0
-        ? `\nДоступные аудиозаписи в базе: ${soundRecords.slice(0, 20).map(r => r.name || r.description).filter(Boolean).join(', ')}.`
+        ? (isEnglish
+            ? `\nAvailable audio records in database: ${soundRecords.slice(0, 20).map(r => r.name || r.description).filter(Boolean).join(', ')}.`
+            : `\nДоступные аудиозаписи в базе: ${soundRecords.slice(0, 20).map(r => r.name || r.description).filter(Boolean).join(', ')}.`)
         : '';
 
-    const systemPrompt = `Ты — эксперт-кардиолог и пульмонолог, разрабатывающий обучающие тесты для студентов медицинских вузов и врачей.
+    const systemPrompt = isEnglish
+        ? `You are an expert cardiologist and pulmonologist developing educational tests for medical students and doctors. Your task is to create clinically accurate questions about auscultation.`
+        : `Ты — эксперт-кардиолог и пульмонолог, разрабатывающий обучающие тесты для студентов медицинских вузов и врачей.
 Твоя задача — создавать клинически достоверные вопросы по аускультации.`;
 
-    const userPrompt = `Создай ${count} тестовых вопроса по аускультации в области ${categoryLabel}, ${diffLabel}.${soundContext}
+    const userPrompt = isEnglish
+        ? `Create ${count} test questions about auscultation in the field of ${categoryLabel}, ${diffLabel}.${soundContext}
+
+Requirements:
+- Questions must be clinically realistic and practically significant
+- Each question must have 4 answer options (a, b, c, d)
+- One correct answer
+- Detailed explanation of the correct answer with clinical reasoning
+
+Return ONLY valid JSON without markdown wrapper:
+{
+  "questions": [
+    {
+      "id": "q1",
+      "question": "Question text",
+      "options": {
+        "a": "Option A",
+        "b": "Option B",
+        "c": "Option C",
+        "d": "Option D"
+      },
+      "correct_answer": "a",
+      "explanation": "Detailed clinical explanation of the correct answer",
+      "category": "${category === 'all' ? 'mixed' : category}",
+      "difficulty": "${difficulty}"
+    }
+  ]
+}`
+        : `Создай ${count} тестовых вопроса по аускультации в области ${categoryLabel}, ${diffLabel}.${soundContext}
 
 Требования:
 - Вопросы должны быть клинически реалистичными и практически значимыми
