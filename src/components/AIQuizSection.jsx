@@ -74,7 +74,10 @@ function AIQuizSection() {
             }
         } catch (err) {
             console.error('Quiz generation error:', err.message || err);
-            setError('Извините, раздел в разработке');
+            const msg = err.name === 'AbortError'
+                ? 'Превышено время ожидания (45с). Попробуйте ещё раз или выберите меньше вопросов.'
+                : (err.message || 'Ошибка генерации. Попробуйте ещё раз.');
+            setError(msg);
         } finally {
             setLoading(false);
         }

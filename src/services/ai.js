@@ -4,7 +4,7 @@
  */
 
 const ROUTERAI_URL = 'https://routerai.ru/api/v1/chat/completions';
-const MODEL = 'deepseek/deepseek-v3.2';
+const MODEL = 'mistralai/mistral-small-2603'; // ~5-7s response, no reasoning overhead
 const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://auscultation-trainer.ru';
 
 function getApiKey() {
