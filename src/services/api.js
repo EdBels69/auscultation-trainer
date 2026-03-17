@@ -21,10 +21,12 @@ export async function getSounds(forceRefresh = false) {
 
     // Map to match application structure
     const sounds = data.map(item => {
-        // Get public URL from file_path
-        const audioUrl = item.file_path
-            ? supabase.storage.from('sounds').getPublicUrl(item.file_path).data.publicUrl
-            : null;
+        // Use direct audio_url if present (legacy records from old project),
+        // otherwise construct from file_path via current Supabase storage
+        const audioUrl = item.audio_url
+            || (item.file_path
+                ? supabase.storage.from('sounds').getPublicUrl(item.file_path).data.publicUrl
+                : null);
 
         return {
             id: item.id,
@@ -36,7 +38,6 @@ export async function getSounds(forceRefresh = false) {
             filePath: item.file_path, // Needed for update/delete
             imageUrl: item.image_url,
             fileName: item.file_name,
-            createdAt: item.created_at,
             createdAt: item.created_at,
             linkedNodeKey: item.linked_node_key,
             audiogramUrl: item.audiogram_url
