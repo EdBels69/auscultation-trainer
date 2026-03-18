@@ -389,7 +389,7 @@ function SurveySection({ user }) {
             label: (
                 <span>
                     <StarOutlined />
-                    SUS
+                    Удобство (SUS)
                     {completed.sus && <Tag color="green" style={{ marginLeft: 4 }}>✓</Tag>}
                 </span>
             ),
