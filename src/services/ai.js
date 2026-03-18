@@ -8,6 +8,32 @@ const ROUTERAI_URL = 'https://routerai.ru/api/v1/chat/completions';
 const MODEL = 'deepseek/deepseek-v3.2'; // fast, affordable, optimal for medical content
 const SITE_URL = import.meta.env.VITE_SITE_URL || window.location.origin;
 
+/**
+ * Strip markdown formatting from AI responses — clean plain text output
+ */
+function stripMarkdown(text) {
+    return text
+        // Remove headers: # ## ### etc
+        .replace(/^#{1,6}\s+/gm, '')
+        // Remove bold: **text** or __text__
+        .replace(/\*\*(.+?)\*\*/g, '$1')
+        .replace(/__(.+?)__/g, '$1')
+        // Remove italic: *text* or _text_ (but not inside words)
+        .replace(/(?<!\w)\*(.+?)\*(?!\w)/g, '$1')
+        .replace(/(?<!\w)_(.+?)_(?!\w)/g, '$1')
+        // Remove horizontal rules ---
+        .replace(/^-{3,}$/gm, '')
+        // Convert markdown bullets (* or -) to dash
+        .replace(/^[\*\-]\s+/gm, '– ')
+        // Remove numbered list dots: "1. " -> "1) "
+        .replace(/^(\d+)\.\s+/gm, '$1) ')
+        // Remove code backticks
+        .replace(/`([^`]+)`/g, '$1')
+        // Clean multiple blank lines
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+}
+
 function getApiKey() {
     return import.meta.env.VITE_OPENROUTER_API_KEY || import.meta.env.VITE_AI_API_KEY || '';
 }
@@ -52,7 +78,7 @@ async function chatCompletion(messages, options = {}) {
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
     if (!content) throw new Error('Пустой ответ от AI');
-    return content;
+    return options.raw ? content : stripMarkdown(content);
 }
 
 /**
@@ -86,15 +112,15 @@ export async function generateQuizQuestions({ count = 5, category = 'all', diffi
             : `\nДоступные аудиозаписи в базе: ${soundRecords.slice(0, 20).map(r => r.name || r.description).filter(Boolean).join(', ')}.`)
         : '';
 
-    const systemPrompt = `Ты — эксперт-кардиолог и пульмонолог, разрабатывающий обучающие тесты по аускультации для студентов 4–6 курса медвуза и ординаторов.
+    const systemPrompt = `Ты — эксперт по аускультации, создающий тесты для студентов 4–6 курса медвуза.
 
-Правила генерации вопросов:
-1. Каждый вопрос — клиническая виньетка (мини-кейс): пол, возраст, жалобы, анамнез → аускультативная находка → вопрос «что это?» или «какой диагноз?».
-2. Дистракторы (неправильные варианты) должны быть клинически правдоподобными и отличаться по конкретным аускультативным признакам (фаза, тембр, точка максимума, иррадиация).
-3. Объяснения: краткие (2–4 предложения), с указанием ключевого аускультативного признака, механизма и дифференциальной диагностики.
-4. ЗАПРЕЩЕНО: ASCII-таблицы, псевдографика, рамки из символов. Только текст и маркированные списки.
-5. Используй клиническую терминологию на уровне пропедевтики внутренних болезней.
-6. Отвечай строго на русском.`;
+Правила:
+1. Каждый вопрос — клиническая виньетка: пол, возраст, жалобы → аускультативная находка → вопрос.
+2. Дистракторы клинически правдоподобные, различаются по аускультативным признакам.
+3. Объяснения: 2–4 предложения, ключевой признак + механизм + дифдиагностика.
+4. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО: markdown (**, ##, *курсив*), ASCII-таблицы, псевдографика, рамки.
+5. Пиши чистым текстом без разметки. Объяснения — живым языком преподавателя.
+6. Только русский язык.`;
 
     const userPrompt = `Создай ${count} тестовых вопроса по аускультации в области ${categoryLabel}, ${diffLabel}.${soundContext}
 
@@ -131,7 +157,7 @@ export async function generateQuizQuestions({ count = 5, category = 'all', diffi
     const content = await chatCompletion([
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
-    ], { temperature: 0.4, max_tokens: 2000 });
+    ], { temperature: 0.4, max_tokens: 2000, raw: true });
 
     // Parse JSON — strip markdown if present
     const jsonStr = content.replace(/```(?:json)?\s*([\s\S]*?)```/g, '$1').trim();
@@ -149,20 +175,18 @@ export async function generateQuizQuestions({ count = 5, category = 'all', diffi
 export async function getAuscultationExplanation(record, language = 'ru', history = []) {
     const lang = language === 'en' ? 'English' : 'Russian';
 
-    const systemPrompt = `Ты — опытный преподаватель пропедевтики внутренних болезней с экспертизой в кардиологии и пульмонологии.
+    const systemPrompt = `Ты — преподаватель пропедевтики внутренних болезней. Объясняешь аускультативные феномены студентам 4–6 курса.
 
-Объясняй аускультативные феномены по структуре:
-1. Определение (1–2 предложения)
-2. Механизм возникновения звука
-3. Аускультативные характеристики (фаза дыхания/сердечного цикла, тембр, частота, точка максимума)
-4. Клиническое значение (при каких заболеваниях)
-5. Дифференциальная диагностика (от чего отличать и по каким признакам)
+Структура: Определение → Механизм → Характеристики звука (фаза, тембр, точка максимума) → Клиника → Дифференциальная диагностика.
 
-Правила:
-- Клинический язык уровня 4–6 курса медвуза, русские термины с латинскими эквивалентами в скобках
-- ЗАПРЕЩЕНО: ASCII-таблицы, псевдографика. Используй маркированные списки
-- Компактно, до 250 слов
-- Отвечай на русском`;
+ФОРМАТ — СТРОГИЕ ПРАВИЛА:
+– Пиши живым языком, как у постели больного. Не как робот.
+– КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО: markdown (**, ##, ###, *курсив*), ASCII-таблицы, псевдографика, рамки.
+– Для списков используй тире (–) в начале строки, не звёздочки.
+– Можно эмодзи умеренно (🫀🩺🫁).
+– Русские термины с латинскими в скобках при первом упоминании.
+– Компактно: до 250 слов. Без воды.
+– Только русский.`;
 
     const contextInfo = [
         record.name && `Феномен: ${record.name}`,
