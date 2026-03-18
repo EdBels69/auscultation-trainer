@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Typography, Empty, Drawer, Button, Spin } from 'antd';
-import { MenuOutlined } from '@ant-design/icons';
+import { MenuOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
 
 import TopicTree from './TopicTree';
 import { getLearningNodes } from '../services/api';
@@ -8,6 +8,56 @@ import { buildLearningTree } from '../utils/structureUtils';
 import AudioPlayer from './AudioPlayer';
 
 const { Title } = Typography;
+
+/** Collapsible description block — shows first ~200px, expandable */
+function CollapsibleDescription({ text }) {
+    const [expanded, setExpanded] = useState(false);
+    const MAX_HEIGHT = 180;
+
+    if (!text) return null;
+
+    return (
+        <div style={{ position: 'relative' }}>
+            <div style={{
+                fontSize: 15,
+                lineHeight: 1.7,
+                color: '#3c4257',
+                padding: '16px 20px',
+                background: '#f8f9fa',
+                borderRadius: 8,
+                borderLeft: '4px solid #635bff',
+                maxHeight: expanded ? 'none' : MAX_HEIGHT,
+                overflow: 'hidden',
+                transition: 'max-height 0.3s ease',
+            }}>
+                {text}
+            </div>
+            {!expanded && text.length > 400 && (
+                <div style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: 48,
+                    background: 'linear-gradient(transparent, #f8f9fa)',
+                    borderRadius: '0 0 8px 8px',
+                    pointerEvents: 'none',
+                }} />
+            )}
+            {text.length > 400 && (
+                <Button
+                    type="link"
+                    size="small"
+                    onClick={() => setExpanded(!expanded)}
+                    style={{ padding: '4px 0', fontSize: 13 }}
+                    icon={expanded ? <UpOutlined /> : <DownOutlined />}
+                >
+                    {expanded ? 'Свернуть' : 'Показать полностью'}
+                </Button>
+            )}
+        </div>
+    );
+}
 
 function LearningSection({ audioRecords }) {
     const [structure, setStructure] = useState({ systems: [] });
@@ -313,17 +363,8 @@ function LearningSection({ audioRecords }) {
 
                                 {/* Folder Description (from learning_nodes) */}
                                 {currentNode?.description && (
-                                    <div style={{
-                                        fontSize: 16,
-                                        lineHeight: 1.7,
-                                        color: '#3c4257',
-                                        marginBottom: 32,
-                                        padding: 20,
-                                        background: '#f8f9fa',
-                                        borderRadius: 8,
-                                        borderLeft: '4px solid #635bff'
-                                    }}>
-                                        {currentNode.description}
+                                    <div style={{ marginBottom: 32 }}>
+                                        <CollapsibleDescription text={currentNode.description} />
                                     </div>
                                 )}
 
@@ -400,18 +441,7 @@ function LearningSection({ audioRecords }) {
                                     }}>
                                         {/* Description */}
                                         {currentNode.description && (
-                                            <div className="description-block" style={{
-                                                fontSize: 15,
-                                                lineHeight: 1.7,
-                                                color: '#3c4257',
-                                                padding: 20,
-                                                background: '#f8f9fa',
-                                                borderRadius: 8,
-                                                borderLeft: '4px solid #635bff',
-                                                height: 'fit-content'
-                                            }}>
-                                                {currentNode.description}
-                                            </div>
+                                            <CollapsibleDescription text={currentNode.description} />
                                         )}
 
                                         {/* Auscultation Image */}
