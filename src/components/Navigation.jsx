@@ -71,10 +71,8 @@ function Navigation({ currentSection, onSectionChange, user, onAuthClick, onSign
         },
     ];
 
-    // Language switcher URLs: EN lives at /en/ subfolder on the same domain
-    const langSwitcherUrl = lang === 'en'
-        ? 'https://edbels9i.beget.tech/'
-        : 'https://edbels9i.beget.tech/en/';
+    // Language switcher: root-relative paths, protocol-independent
+    const langSwitcherUrl = lang === 'en' ? '/' : '/en/';
 
     return (
         <>
