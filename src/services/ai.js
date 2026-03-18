@@ -85,53 +85,34 @@ export async function generateQuizQuestions({ count = 5, category = 'all', diffi
             : `\nДоступные аудиозаписи в базе: ${soundRecords.slice(0, 20).map(r => r.name || r.description).filter(Boolean).join(', ')}.`)
         : '';
 
-    const systemPrompt = isEnglish
-        ? `You are an expert cardiologist and pulmonologist developing educational tests for medical students and doctors. Your task is to create clinically accurate questions about auscultation.`
-        : `Ты — эксперт-кардиолог и пульмонолог, разрабатывающий обучающие тесты для студентов медицинских вузов и врачей.
-Твоя задача — создавать клинически достоверные вопросы по аускультации.`;
+    const systemPrompt = `Ты — эксперт-кардиолог и пульмонолог, разрабатывающий обучающие тесты по аускультации для студентов 4–6 курса медвуза и ординаторов.
 
-    const userPrompt = isEnglish
-        ? `Create ${count} test questions about auscultation in the field of ${categoryLabel}, ${diffLabel}.${soundContext}
+Правила генерации вопросов:
+1. Каждый вопрос — клиническая виньетка (мини-кейс): пол, возраст, жалобы, анамнез → аускультативная находка → вопрос «что это?» или «какой диагноз?».
+2. Дистракторы (неправильные варианты) должны быть клинически правдоподобными и отличаться по конкретным аускультативным признакам (фаза, тембр, точка максимума, иррадиация).
+3. Объяснения: краткие (2–4 предложения), с указанием ключевого аускультативного признака, механизма и дифференциальной диагностики.
+4. ЗАПРЕЩЕНО: ASCII-таблицы, псевдографика, рамки из символов. Только текст и маркированные списки.
+5. Используй клиническую терминологию на уровне пропедевтики внутренних болезней.
+6. Отвечай строго на русском.`;
 
-Requirements:
-- Questions must be clinically realistic and practically significant
-- Each question must have 4 answer options (a, b, c, d)
-- One correct answer
-- Detailed explanation of the correct answer with clinical reasoning
+    const userPrompt = `Создай ${count} тестовых вопроса по аускультации в области ${categoryLabel}, ${diffLabel}.${soundContext}
 
-Return ONLY valid JSON without markdown wrapper:
-{
-  "questions": [
-    {
-      "id": "q1",
-      "question": "Question text",
-      "options": {
-        "a": "Option A",
-        "b": "Option B",
-        "c": "Option C",
-        "d": "Option D"
-      },
-      "correct_answer": "a",
-      "explanation": "Detailed clinical explanation of the correct answer",
-      "category": "${category === 'all' ? 'mixed' : category}",
-      "difficulty": "${difficulty}"
-    }
-  ]
-}`
-        : `Создай ${count} тестовых вопроса по аускультации в области ${categoryLabel}, ${diffLabel}.${soundContext}
+Формат каждого вопроса — клиническая виньетка:
+«Пациент(ка) N лет, поступил(а) с жалобами на ... При аускультации [точка] выслушивается [описание звука]. Какой аускультативный феномен наиболее вероятен?»
 
 Требования:
-- Вопросы должны быть клинически реалистичными и практически значимыми
-- Каждый вопрос должен иметь 4 варианта ответа (a, b, c, d)
+- Виньетка должна содержать: пол, возраст, ключевые жалобы, точку аускультации, описание звука
+- 4 варианта ответа (a, b, c, d) — клинически правдоподобные
 - Один правильный ответ
-- Подробное объяснение правильного ответа с клинической аргументацией
+- Объяснение (2–4 предложения): ключевой признак, механизм, чем отличается от дистракторов
+- НЕ используй ASCII-таблицы или псевдографику в объяснениях
 
 Верни ТОЛЬКО валидный JSON без markdown-обёртки:
 {
   "questions": [
     {
       "id": "q1",
-      "question": "Текст вопроса",
+      "question": "Текст клинической виньетки",
       "options": {
         "a": "Вариант А",
         "b": "Вариант Б",
@@ -139,7 +120,7 @@ Return ONLY valid JSON without markdown wrapper:
         "d": "Вариант Г"
       },
       "correct_answer": "a",
-      "explanation": "Подробное клиническое объяснение правильного ответа",
+      "explanation": "Краткое клиническое объяснение с дифференциальной диагностикой",
       "category": "${category === 'all' ? 'mixed' : category}",
       "difficulty": "${difficulty}"
     }
@@ -167,9 +148,20 @@ Return ONLY valid JSON without markdown wrapper:
 export async function getAuscultationExplanation(record, language = 'ru', history = []) {
     const lang = language === 'en' ? 'English' : 'Russian';
 
-    const systemPrompt = language === 'ru'
-        ? `Ты — опытный преподаватель клинических дисциплин с экспертизой в кардиологии и пульмонологии. Объясняй аускультативные феномены чётко, с клинической аргументацией. Используй структурированный формат: механизм → клиническое значение → диффдиагноз. Отвечай по-русски.`
-        : `You are an experienced clinical educator with expertise in cardiology and pulmonology. Explain auscultatory phenomena clearly with clinical reasoning. Use structured format: mechanism → clinical significance → differential diagnosis. Respond in English.`;
+    const systemPrompt = `Ты — опытный преподаватель пропедевтики внутренних болезней с экспертизой в кардиологии и пульмонологии.
+
+Объясняй аускультативные феномены по структуре:
+1. Определение (1–2 предложения)
+2. Механизм возникновения звука
+3. Аускультативные характеристики (фаза дыхания/сердечного цикла, тембр, частота, точка максимума)
+4. Клиническое значение (при каких заболеваниях)
+5. Дифференциальная диагностика (от чего отличать и по каким признакам)
+
+Правила:
+- Клинический язык уровня 4–6 курса медвуза, русские термины с латинскими эквивалентами в скобках
+- ЗАПРЕЩЕНО: ASCII-таблицы, псевдографика. Используй маркированные списки
+- Компактно, до 250 слов
+- Отвечай на русском`;
 
     const contextInfo = [
         record.name && `Феномен: ${record.name}`,
