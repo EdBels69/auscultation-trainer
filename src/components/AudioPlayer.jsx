@@ -22,7 +22,7 @@ function AudioPlayer({ audioUrl }) {
       container: waveformRef.current,
       waveColor: '#4F4A85',
       progressColor: '#383351',
-      height: 60,
+      height: 48,
       minPxPerSec: 150,
       autoScroll: true,
       autoCenter: true,
@@ -78,10 +78,9 @@ function AudioPlayer({ audioUrl }) {
     <div
       ref={containerRef}
       style={{
-        background: '#fff',
+        background: '#f8f9fa',
         borderRadius: 8,
-        border: '1px solid #e3e8ee',
-        padding: 12,
+        padding: '8px 10px',
         maxWidth: '100%'
       }}
     >
@@ -94,20 +93,21 @@ function AudioPlayer({ audioUrl }) {
         <div ref={waveformRef} />
       </div>
 
-      {/* Контролы */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
+      {/* Контролы — компактная строка */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
         <Button
           type="primary"
+          size="small"
           icon={playing ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
           onClick={togglePlay}
-          style={{ background: '#4F4A85', border: 'none' }}
+          style={{ background: '#4F4A85', border: 'none', fontSize: 12 }}
         >
           {playing ? 'Пауза' : 'Играть'}
         </Button>
 
         {/* Громкость */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: 100 }}>
-          <SoundOutlined style={{ color: '#888', fontSize: 14 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, width: 90 }}>
+          <SoundOutlined style={{ color: '#888', fontSize: 12 }} />
           <Slider
             value={volume}
             onChange={handleVolumeChange}

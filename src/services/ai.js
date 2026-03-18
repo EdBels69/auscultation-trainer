@@ -1,10 +1,11 @@
 /**
  * AI service — RouterAI → DeepSeek V3.2
+ * Model: deepseek/deepseek-v3.2
  * Endpoint: https://routerai.ru/api/v1 (OpenAI-compatible)
  */
 
 const ROUTERAI_URL = 'https://routerai.ru/api/v1/chat/completions';
-const MODEL = 'mistralai/mistral-small-2603'; // ~5-7s response, no reasoning overhead
+const MODEL = 'deepseek/deepseek-v3.2'; // fast, affordable, optimal for medical content
 const SITE_URL = import.meta.env.VITE_SITE_URL || window.location.origin;
 
 function getApiKey() {

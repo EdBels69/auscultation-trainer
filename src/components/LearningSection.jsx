@@ -478,7 +478,7 @@ function LearningSection({ audioRecords }) {
 
                                 {/* 4. Audio List */}
                                 {filteredRecords.length > 0 ? (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                         <div style={{
                                             fontSize: 13,
                                             fontWeight: 600,
@@ -497,22 +497,59 @@ function LearningSection({ audioRecords }) {
                                                 style={{
                                                     background: '#fff',
                                                     border: '1px solid #e3e8ee',
-                                                    borderRadius: 12,
-                                                    padding: 20
+                                                    borderRadius: 10,
+                                                    padding: '14px 16px'
                                                 }}
                                             >
-                                                {/* Patient Info Header */}
+                                                {/* Compact header: icon + patient info + description */}
                                                 <div style={{
-                                                    marginBottom: 12,
-                                                    fontSize: 14,
-                                                    fontWeight: 500,
-                                                    color: '#0a2540',
                                                     display: 'flex',
                                                     alignItems: 'center',
-                                                    gap: 8
+                                                    gap: 10,
+                                                    marginBottom: 10
                                                 }}>
-                                                    <span style={{ fontSize: 16 }}>👤</span>
-                                                    {record.position || 'Пациент'}
+                                                    <div style={{
+                                                        width: 32,
+                                                        height: 32,
+                                                        borderRadius: 8,
+                                                        background: record.category === 'cardiac'
+                                                            ? 'linear-gradient(135deg, #ff6b6b, #ee5a5a)'
+                                                            : 'linear-gradient(135deg, #635bff, #00d4ff)',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        flexShrink: 0,
+                                                        fontSize: 14,
+                                                        color: '#fff'
+                                                    }}>
+                                                        {record.category === 'cardiac' ? '♥' : '🫁'}
+                                                    </div>
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <div style={{
+                                                            fontSize: 13,
+                                                            fontWeight: 600,
+                                                            color: '#0a2540',
+                                                            lineHeight: 1.3,
+                                                            whiteSpace: 'nowrap',
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis'
+                                                        }}>
+                                                            {record.position || 'Пациент'}
+                                                        </div>
+                                                        {record.description && (
+                                                            <div style={{
+                                                                fontSize: 12,
+                                                                color: '#697386',
+                                                                lineHeight: 1.3,
+                                                                marginTop: 2,
+                                                                whiteSpace: 'nowrap',
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis'
+                                                            }}>
+                                                                {record.description}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
 
                                                 {/* Player */}

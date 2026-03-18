@@ -211,7 +211,7 @@ function AIChatSection({ user }) {
                         ИИ-помощник по аускультации
                     </div>
                     <div style={{ fontSize: 12, color: '#8898aa' }}>
-                        Mistral · объясняет, разбирает ошибки, отвечает на вопросы
+                        DeepSeek · объясняет, разбирает ошибки, отвечает на вопросы
                     </div>
                 </div>
             </div>
