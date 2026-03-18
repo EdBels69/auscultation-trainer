@@ -6,20 +6,18 @@ import {
     UserOutlined, LogoutOutlined, FormOutlined, ProfileOutlined,
     MessageOutlined,
 } from '@ant-design/icons';
-import { useLanguage, tx } from '../contexts/LanguageContext';
 
 const { Header } = Layout;
 const { Title } = Typography;
 
 const ROLE_LABELS = {
-    student: { ru: 'Студент', en: 'Student' },
-    resident: { ru: 'Ординатор', en: 'Resident' },
-    doctor: { ru: 'Врач', en: 'Doctor' },
-    teacher: { ru: 'Преподаватель', en: 'Teacher' },
+    student: 'Студент',
+    resident: 'Ординатор',
+    doctor: 'Врач',
+    teacher: 'Преподаватель',
 };
 
 function Navigation({ currentSection, onSectionChange, user, onAuthClick, onSignOut }) {
-    const lang = useLanguage();
     const [isMobile, setIsMobile] = useState(false);
     const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -31,13 +29,13 @@ function Navigation({ currentSection, onSectionChange, user, onAuthClick, onSign
     }, []);
 
     const items = [
-        { key: 'learning', label: tx(lang, 'Обучение', 'Learning'), icon: <BookOutlined /> },
-        { key: 'theory', label: tx(lang, 'Теория', 'Theory'), icon: <ReadOutlined /> },
-        { key: 'test', label: tx(lang, 'Тест', 'Test'), icon: <FileTextOutlined /> },
-        { key: 'aiquiz', label: tx(lang, 'ИИ-Квиз', 'AI Quiz'), icon: <RobotOutlined /> },
-        { key: 'chat', label: tx(lang, 'ИИ-Чат', 'AI Chat'), icon: <MessageOutlined /> },
-        { key: 'surveys', label: tx(lang, 'Анкеты', 'Surveys'), icon: <FormOutlined /> },
-        { key: 'admin', label: tx(lang, 'Управление', 'Management'), icon: <SettingOutlined /> },
+        { key: 'learning', label: 'Обучение', icon: <BookOutlined /> },
+        { key: 'theory', label: 'Теория', icon: <ReadOutlined /> },
+        { key: 'test', label: 'Тест', icon: <FileTextOutlined /> },
+        { key: 'aiquiz', label: 'ИИ-Квиз', icon: <RobotOutlined /> },
+        { key: 'chat', label: 'ИИ-Чат', icon: <MessageOutlined /> },
+        { key: 'surveys', label: 'Анкеты', icon: <FormOutlined /> },
+        { key: 'admin', label: 'Управление', icon: <SettingOutlined /> },
     ];
 
     const handleSelect = ({ key }) => {
@@ -51,28 +49,25 @@ function Navigation({ currentSection, onSectionChange, user, onAuthClick, onSign
     const userMenuItems = [
         {
             key: 'profile',
-            label: tx(lang, 'Мой профиль', 'My Profile'),
+            label: 'Мой профиль',
             icon: <ProfileOutlined />,
             onClick: () => onSectionChange('profile'),
         },
         {
             key: 'surveys',
-            label: tx(lang, 'Мои анкеты', 'My Surveys'),
+            label: 'Мои анкеты',
             icon: <FormOutlined />,
             onClick: () => onSectionChange('surveys'),
         },
         { type: 'divider' },
         {
             key: 'logout',
-            label: tx(lang, 'Выйти', 'Log out'),
+            label: 'Выйти',
             icon: <LogoutOutlined />,
             danger: true,
             onClick: onSignOut,
         },
     ];
-
-    // Language switcher: root-relative paths, protocol-independent
-    const langSwitcherUrl = lang === 'en' ? '/' : '/en/';
 
     return (
         <>
@@ -103,7 +98,7 @@ function Navigation({ currentSection, onSectionChange, user, onAuthClick, onSign
                     whiteSpace: 'nowrap',
                     flexShrink: 0,
                 }}>
-                    🎧 {isMobile ? tx(lang, 'Аускультация', 'Auscultation') : tx(lang, 'Тренажёр аускультации', 'Auscultation Trainer')}
+                    🎧 {isMobile ? 'Аускультация' : 'Тренажёр аускультации'}
                 </Title>
 
                 {/* Desktop menu */}
@@ -120,36 +115,18 @@ function Navigation({ currentSection, onSectionChange, user, onAuthClick, onSign
 
                 {/* User area */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                    {/* Language switcher link */}
-                    <a href={langSwitcherUrl} style={{
-                        fontSize: 12,
-                        color: '#8898aa',
-                        textDecoration: 'none',
-                        padding: '4px 8px',
-                        borderRadius: 4,
-                        transition: 'all 0.3s',
-                    }} onMouseEnter={(e) => {
-                        e.target.style.background = 'rgba(0,0,0,0.04)';
-                        e.target.style.color = '#0a2540';
-                    }} onMouseLeave={(e) => {
-                        e.target.style.background = 'transparent';
-                        e.target.style.color = '#8898aa';
-                    }}>
-                        {lang === 'en' ? '🇷🇺 RU' : '🇬🇧 EN'}
-                    </a>
-
                     {user ? (
                         <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                                 <Avatar size={28} icon={<UserOutlined />} style={{ background: '#635bff' }} />
                                 {!isMobile && (
                                     <div style={{ lineHeight: 1.3 }}>
-                                        <div style={{ fontSize: 12, fontWeight: 600, color: '#0a2540' }}>
-                                            {name.split(' ')[0] || tx(lang, 'Пользователь', 'User')}
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#0a2540' }}>
+                                            {name.split(' ')[0] || 'Пользователь'}
                                         </div>
                                         {role && (
                                             <div style={{ fontSize: 10, color: '#8898aa' }}>
-                                                {ROLE_LABELS[role]?.[lang] || ROLE_LABELS[role]?.ru || role}
+                                                {ROLE_LABELS[role] || role}
                                             </div>
                                         )}
                                     </div>
@@ -158,7 +135,7 @@ function Navigation({ currentSection, onSectionChange, user, onAuthClick, onSign
                         </Dropdown>
                     ) : (
                         <Button size="small" onClick={onAuthClick} style={{ fontSize: 12 }}>
-                            {tx(lang, 'Войти', 'Log in')}
+                            Войти
                         </Button>
                     )}
 
@@ -176,7 +153,7 @@ function Navigation({ currentSection, onSectionChange, user, onAuthClick, onSign
 
             {/* Mobile nav drawer */}
             <Drawer
-                title={tx(lang, 'Меню', 'Menu')}
+                title="Меню"
                 placement="right"
                 open={drawerOpen}
                 onClose={() => setDrawerOpen(false)}
@@ -193,7 +170,7 @@ function Navigation({ currentSection, onSectionChange, user, onAuthClick, onSign
                 {!user && (
                     <div style={{ padding: '16px' }}>
                         <Button block onClick={() => { onAuthClick(); setDrawerOpen(false); }}>
-                            {tx(lang, 'Войти / Зарегистрироваться', 'Log in / Register')}
+                            Войти / Зарегистрироваться
                         </Button>
                     </div>
                 )}

@@ -1,11 +1,9 @@
 import { Typography, Tag } from 'antd';
 import { HeartOutlined, SoundOutlined } from '@ant-design/icons';
-import { useLanguage } from '../contexts/LanguageContext';
 
 const { Text } = Typography;
 
 function SoundCard({ record, isSelected, onClick }) {
-    const lang = useLanguage();
     const styles = {
         card: {
             display: 'flex',
@@ -91,7 +89,7 @@ function SoundCard({ record, isSelected, onClick }) {
             {/* Content - always in column: title on top, tag below */}
             <div style={styles.content}>
                 <div style={styles.title}>
-                    {lang === 'en' && record.nameEn ? record.nameEn : record.name}
+                    {record.name}
                 </div>
                 <Tag style={styles.tag}>{record.position}</Tag>
             </div>

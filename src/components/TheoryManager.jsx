@@ -41,7 +41,6 @@ function TheoryManager() {
     const [contentEditingNode, setContentEditingNode] = useState(null);
     const [selectedIcon, setSelectedIcon] = useState('FileTextOutlined');
     const [saving, setSaving] = useState(false);
-    const [contentLang, setContentLang] = useState('ru');
     const [form] = Form.useForm();
     const [expandedKeys, setExpandedKeys] = useState([]);
 
@@ -104,8 +103,6 @@ function TheoryManager() {
         form.setFieldsValue({
             title: node.title,
             sidebar_title: node.sidebar_title,
-            title_en: node.title_en,
-            sidebar_title_en: node.sidebar_title_en,
             category: node.category,
             is_folder: node.is_folder,
             parent_id: node.parent_id
@@ -116,7 +113,6 @@ function TheoryManager() {
 
     const handleEditContent = (node) => {
         setContentEditingNode(node);
-        setContentLang('ru');
         setIsEditorOpen(true);
     };
 
@@ -152,11 +148,10 @@ function TheoryManager() {
 
         setSaving(true);
         try {
-            const field = contentLang === 'en' ? 'content_en' : 'content';
-            await updateTheoryNode(contentEditingNode.id, { [field]: html });
-            message.success(contentLang === 'en' ? 'EN content saved' : 'Содержимое сохранено');
-            // Update local node so tab switch shows fresh content without reload
-            setContentEditingNode(prev => ({ ...prev, [field]: html }));
+            await updateTheoryNode(contentEditingNode.id, { content: html });
+            message.success('Содержимое сохранено');
+            // Update local node so it shows fresh content without reload
+            setContentEditingNode(prev => ({ ...prev, content: html }));
             loadNodes();
         } catch (error) {
             message.error('Ошибка сохранения');
@@ -328,21 +323,12 @@ function TheoryManager() {
             >
                 <Form form={form} layout="vertical" onFinish={handleSave}>
                     {/* RU Title */}
-                    <Form.Item name="title" label="Полное название (RU)" rules={[{ required: true }]}>
+                    <Form.Item name="title" label="Полное название" rules={[{ required: true }]}>
                         <Input placeholder="Полный заголовок статьи" />
                     </Form.Item>
 
-                    <Form.Item name="sidebar_title" label="Заголовок для сайдбара (RU)">
+                    <Form.Item name="sidebar_title" label="Заголовок для сайдбара">
                         <Input placeholder="Короткое название для меню" maxLength={30} showCount />
-                    </Form.Item>
-
-                    {/* EN Title */}
-                    <Form.Item name="title_en" label="Full title (EN)">
-                        <Input placeholder="Full article title in English" />
-                    </Form.Item>
-
-                    <Form.Item name="sidebar_title_en" label="Sidebar title (EN)">
-                        <Input placeholder="Short English title for menu" maxLength={30} showCount />
                     </Form.Item>
 
                     <Form.Item label="Иконка">
@@ -386,12 +372,6 @@ function TheoryManager() {
                     <span>
                         <FormOutlined style={{ marginRight: 8 }} />
                         Редактор: {contentEditingNode?.title}
-                        <Tag
-                            color={contentLang === 'en' ? 'blue' : 'green'}
-                            style={{ marginLeft: 12, fontSize: 12 }}
-                        >
-                            {contentLang.toUpperCase()}
-                        </Tag>
                     </span>
                 }
                 placement="right"
@@ -401,33 +381,11 @@ function TheoryManager() {
                 destroyOnClose
             >
                 {contentEditingNode && (
-                    <>
-                        <Tabs
-                            activeKey={contentLang}
-                            onChange={setContentLang}
-                            style={{ marginBottom: 0 }}
-                            items={[
-                                {
-                                    key: 'ru',
-                                    label: '🇷🇺 Русский',
-                                },
-                                {
-                                    key: 'en',
-                                    label: '🇬🇧 English',
-                                },
-                            ]}
-                        />
-                        <TheoryEditor
-                            key={contentLang}
-                            initialContent={
-                                contentLang === 'en'
-                                    ? (contentEditingNode.content_en || '')
-                                    : (contentEditingNode.content || '')
-                            }
-                            onSave={handleSaveContent}
-                            saving={saving}
-                        />
-                    </>
+                    <TheoryEditor
+                        initialContent={contentEditingNode.content || ''}
+                        onSave={handleSaveContent}
+                        saving={saving}
+                    />
                 )}
             </Drawer>
         </div>

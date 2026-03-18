@@ -31,16 +31,14 @@ async function enrichWithAI(records, apiKey) {
     ).join('\n');
 
     const prompt = `You are a clinical medicine expert. For each auscultation sound record below, return:
-1. name_en: concise English clinical name (e.g. "Dry Wheezes - Variant 1 (Bronchial Asthma)")
-2. description_en: 1 sentence for medical students explaining what this sound is
-3. auscultation_point: anatomical location (e.g. "All lung fields", "Apex", "Aortic area")
-4. difficulty: easy/medium/hard
+1. auscultation_point: anatomical location (e.g. "All lung fields", "Apex", "Aortic area")
+2. difficulty: easy/medium/hard
 
 Records:
 ${rows}
 
 Return ONLY valid JSON array, exactly ${records.length} items, no markdown:
-[{"id":1,"name_en":"...","description_en":"...","auscultation_point":"...","difficulty":"medium"}]`;
+[{"id":1,"auscultation_point":"...","difficulty":"medium"}]`;
 
     const r = await fetch('https://routerai.ru/api/v1/chat/completions', {
         method: 'POST',
@@ -162,8 +160,6 @@ function BatchImportModal({ open, onClose, onSuccess }) {
                 const en = enMap[i + 1] || {};
                 return {
                     ...r,
-                    nameEn: en.name_en || '',
-                    descriptionEn: en.description_en || '',
                     auscultationPoint: en.auscultation_point || '',
                     difficulty: en.difficulty || 'medium',
                     category: r.num >= 22 ? 'cardiac' : 'pulmonary',
@@ -201,9 +197,7 @@ function BatchImportModal({ open, onClose, onSuccess }) {
                 const { data: { publicUrl } } = supabase.storage.from('sounds').getPublicUrl(safeName);
                 const { error: dbErr } = await supabase.from('sounds').insert({
                     name: r.phenomenon,
-                    name_en: r.nameEn || null,
                     description: r.diagnosis,
-                    description_en: r.descriptionEn || null,
                     category: r.category,
                     position: r.auscultationPoint,
                     difficulty: r.difficulty,
@@ -229,11 +223,6 @@ function BatchImportModal({ open, onClose, onSuccess }) {
         { title: '№', dataIndex: 'num', width: 45 },
         { title: 'Феномен (RU)', dataIndex: 'phenomenon', width: 200,
           render: (v, r) => <Text style={{ fontSize: 12 }}>{v}{r.variant > 1 ? ` #${r.variant}` : ''}</Text> },
-        { title: 'EN name (AI)', dataIndex: 'nameEn', width: 200,
-          render: (v, r) => <Input size="small" value={v} onChange={e => {
-              const updated = records.map(x => x.num === r.num ? {...x, nameEn: e.target.value} : x);
-              setRecords(updated);
-          }} /> },
         { title: 'Точка', dataIndex: 'auscultationPoint', width: 130,
           render: (v, r) => <Input size="small" value={v} onChange={e => {
               setRecords(records.map(x => x.num === r.num ? {...x, auscultationPoint: e.target.value} : x));
