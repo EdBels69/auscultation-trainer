@@ -154,7 +154,10 @@ export async function getSounds(forceRefresh = false) {
         filePath: record.file_path,
         createdAt: record.created_at,
         auscultationPoint: record.auscultation_point,
-        auscultationImageUrl: record.auscultation_image_url
+        auscultationImageUrl: record.auscultation_image_url,
+        explanation: record.explanation || null,
+        clinicalContext: record.clinical_context || null,
+        difficulty: record.difficulty || 'medium',
     }));
 
     soundsCache = mapped;
@@ -189,7 +192,10 @@ export async function addSound(soundData, audioFile, auscultationImageFile) {
             audio_url: audioUrl,
             file_path: filePath,
             auscultation_point: soundData.auscultation_point || null,
-            auscultation_image_url: auscultationImageUrl
+            auscultation_image_url: auscultationImageUrl,
+            explanation: soundData.explanation || null,
+            clinical_context: soundData.clinical_context || null,
+            difficulty: soundData.difficulty || 'medium',
         })
         .select()
         .single();
@@ -210,7 +216,11 @@ export async function updateSound(id, soundData) {
         name: soundData.name,
         description: soundData.description || '',
         category: soundData.category,
-        linked_node_key: soundData.linked_node_key
+        linked_node_key: soundData.linked_node_key,
+        auscultation_point: soundData.auscultation_point ?? null,
+        explanation: soundData.explanation ?? null,
+        clinical_context: soundData.clinical_context ?? null,
+        difficulty: soundData.difficulty || 'medium',
     };
 
     if (typeof soundData.position === 'number') {
@@ -260,7 +270,11 @@ export async function updateSoundWithFile(id, soundData, audioFile, imageFile, a
             category: soundData.category,
             linked_node_key: soundData.linked_node_key,
             audio_url: audioUrl,
-            file_path: filePath
+            file_path: filePath,
+            auscultation_point: soundData.auscultation_point ?? null,
+            explanation: soundData.explanation ?? null,
+            clinical_context: soundData.clinical_context ?? null,
+            difficulty: soundData.difficulty || 'medium',
         })
         .eq('id', id)
         .select()

@@ -31,11 +31,14 @@ export async function getSounds(forceRefresh = false) {
         return {
             id: item.id,
             name: item.name,
+            nameEn: item.name_en || null,
             description: item.description,
+            descriptionEn: item.description_en || null,
             category: item.category,
             position: item.position,
+            difficulty: item.difficulty || 'medium',
             audioUrl: audioUrl,
-            filePath: item.file_path, // Needed for update/delete
+            filePath: item.file_path,
             imageUrl: item.image_url,
             fileName: item.file_name,
             createdAt: item.created_at,

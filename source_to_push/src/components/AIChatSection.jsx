@@ -32,13 +32,29 @@ function getChips(lastTestResult) {
   ];
 }
 
+const CHAT_STORAGE_KEY = 'ai_chat_history';
+
 function AIChatSection({ userProfile, currentSection, lastTestResult }) {
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(CHAT_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lastMessageTime, setLastMessageTime] = useState(0);
   const messagesEndRef = useRef(null);
+
+  // Сохраняем историю в sessionStorage при каждом обновлении
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages));
+    } catch { /* ignore quota errors */ }
+  }, [messages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -109,6 +125,7 @@ function AIChatSection({ userProfile, currentSection, lastTestResult }) {
   const clearChat = () => {
     setMessages([]);
     setError(null);
+    sessionStorage.removeItem(CHAT_STORAGE_KEY);
   };
 
   // Контекстная плашка

@@ -11,7 +11,9 @@ import {
     Space,
     Tag,
     message,
-    Upload
+    Upload,
+    Row,
+    Col,
 } from 'antd';
 import {
     EditOutlined,
@@ -28,25 +30,42 @@ import AudioPlayer from './AudioPlayer';
 
 const { Text } = Typography;
 const { Option } = Select;
+const { TextArea } = Input;
+
+const AUSCULTATION_POINTS = [
+    { value: 'A', label: 'A — Аортальная' },
+    { value: 'P', label: 'P — Пульмональная' },
+    { value: 'E', label: 'E — Эрба (Боткина)' },
+    { value: 'T', label: 'T — Трикуспидальная' },
+    { value: 'M', label: 'M — Митральная (верхушка)' },
+];
 
 function AudioList({ audioRecords, onUpdate }) {
     const [editingId, setEditingId] = useState(null);
     const [editForm] = Form.useForm();
     const [audioFile, setAudioFile] = useState(null);
 
+    const [editCategory, setEditCategory] = useState(null);
+
     const startEditing = (record) => {
         setEditingId(record.id);
         setAudioFile(null);
+        setEditCategory(record.category || 'cardiac');
         editForm.setFieldsValue({
             name: record.name,
             description: record.description,
-            category: record.category
+            category: record.category,
+            auscultation_point: record.auscultationPoint || undefined,
+            explanation: record.explanation || '',
+            clinical_context: record.clinicalContext || '',
+            difficulty: record.difficulty || 'medium',
         });
     };
 
     const cancelEditing = () => {
         setEditingId(null);
         setAudioFile(null);
+        setEditCategory(null);
         editForm.resetFields();
     };
 
@@ -58,7 +77,11 @@ function AudioList({ audioRecords, onUpdate }) {
                 name: values.name,
                 description: values.description,
                 category: values.category,
-                linked_node_key: item.linkedNodeKey
+                linked_node_key: item.linkedNodeKey,
+                auscultation_point: values.category === 'cardiac' ? (values.auscultation_point || null) : null,
+                explanation: values.explanation || null,
+                clinical_context: values.clinical_context || null,
+                difficulty: values.difficulty || 'medium',
             };
 
             if (audioFile) {
@@ -192,33 +215,76 @@ function AudioList({ audioRecords, onUpdate }) {
                         >
                             {isEditing ? (
                                 <Form form={editForm} layout="vertical" size="small">
+                                    <Row gutter={12}>
+                                        <Col span={14}>
+                                            <Form.Item
+                                                name="description"
+                                                label="Информация о пациенте"
+                                                style={{ marginBottom: 8 }}
+                                            >
+                                                <Input placeholder="М, 54 года, анамнез..." />
+                                            </Form.Item>
+                                        </Col>
+                                        <Col span={10}>
+                                            <Form.Item
+                                                name="category"
+                                                label="Категория"
+                                                rules={[{ required: true }]}
+                                                style={{ marginBottom: 8 }}
+                                            >
+                                                <Select onChange={(v) => setEditCategory(v)}>
+                                                    <Option value="cardiac">Кардиология</Option>
+                                                    <Option value="pulmonary">Пульмонология</Option>
+                                                </Select>
+                                            </Form.Item>
+                                        </Col>
+                                    </Row>
+
+                                    <Row gutter={12}>
+                                        <Col span={14}>
+                                            {editCategory === 'cardiac' && (
+                                                <Form.Item
+                                                    name="auscultation_point"
+                                                    label="Точка аускультации"
+                                                    style={{ marginBottom: 8 }}
+                                                >
+                                                    <Select allowClear placeholder="Выберите точку">
+                                                        {AUSCULTATION_POINTS.map(p => (
+                                                            <Option key={p.value} value={p.value}>{p.label}</Option>
+                                                        ))}
+                                                    </Select>
+                                                </Form.Item>
+                                            )}
+                                        </Col>
+                                        <Col span={10}>
+                                            <Form.Item
+                                                name="difficulty"
+                                                label="Сложность"
+                                                style={{ marginBottom: 8 }}
+                                            >
+                                                <Select>
+                                                    <Option value="easy"><Tag color="green">Лёгкий</Tag></Option>
+                                                    <Option value="medium"><Tag color="orange">Средний</Tag></Option>
+                                                    <Option value="hard"><Tag color="red">Сложный</Tag></Option>
+                                                </Select>
+                                            </Form.Item>
+                                        </Col>
+                                    </Row>
+
                                     <Form.Item
-                                        name="name"
-                                        label="Название"
-                                        rules={[{ required: true }]}
+                                        name="explanation"
+                                        label="Объяснение для теста"
                                         style={{ marginBottom: 8 }}
                                     >
-                                        <Input placeholder="Систолический шум..." />
+                                        <TextArea rows={2} placeholder="Почему этот ответ правильный..." />
                                     </Form.Item>
 
                                     <Form.Item
-                                        name="description"
-                                        label="Информация о пациенте"
+                                        name="clinical_context"
+                                        label="Клинический контекст для ИИ"
                                         style={{ marginBottom: 8 }}
                                     >
-                                        <Input placeholder="М, 54 года, анамнез..." />
-                                    </Form.Item>
-
-                                    <Form.Item
-                                        name="category"
-                                        label="Категория"
-                                        rules={[{ required: true }]}
-                                        style={{ marginBottom: 8 }}
-                                    >
-                                        <Select>
-                                            <Option value="cardiac">Кардиология</Option>
-                                            <Option value="pulmonary">Пульмонология</Option>
-                                        </Select>
+                                        <TextArea rows={2} placeholder="Диагноз, механизм, дифдиагноз..." />
                                     </Form.Item>
 
                                     <div style={{ marginBottom: 12 }}>
@@ -256,12 +322,26 @@ function AudioList({ audioRecords, onUpdate }) {
                                 <div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                                         <div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                                                 <SoundOutlined style={{ color: hasAudio(item) ? '#52c41a' : '#faad14' }} />
                                                 <Text strong>{item.name}</Text>
                                                 <Tag color={item.category === 'cardiac' ? 'red' : 'blue'}>
                                                     {item.category === 'cardiac' ? 'Кард' : 'Пульм'}
                                                 </Tag>
+                                                {item.auscultationPoint && (
+                                                    <Tag color="purple">{item.auscultationPoint}</Tag>
+                                                )}
+                                                {item.difficulty && item.difficulty !== 'medium' && (
+                                                    <Tag color={item.difficulty === 'easy' ? 'green' : 'red'}>
+                                                        {item.difficulty === 'easy' ? 'Лёгкий' : 'Сложный'}
+                                                    </Tag>
+                                                )}
+                                                {item.explanation && (
+                                                    <Tag color="cyan" style={{ fontSize: 11 }}>✓ объяснение</Tag>
+                                                )}
+                                                {item.clinicalContext && (
+                                                    <Tag color="geekblue" style={{ fontSize: 11 }}>✓ ИИ-контекст</Tag>
+                                                )}
                                             </div>
                                             {item.description && (
                                                 <Text type="secondary" style={{ fontSize: 12 }}>

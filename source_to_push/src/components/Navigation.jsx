@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Layout, Menu, Typography, Button, Space, Dropdown, Avatar, Drawer, Grid } from 'antd';
+import { Layout, Menu, Typography, Button, Space, Dropdown, Avatar, Drawer, Grid, Tooltip } from 'antd';
 import {
     BookOutlined, FileTextOutlined, SettingOutlined, ReadOutlined,
     MessageOutlined, UserOutlined, LogoutOutlined, BarChartOutlined,
-    MenuOutlined, LineChartOutlined
+    MenuOutlined, LineChartOutlined, BulbOutlined, BulbFilled
 } from '@ant-design/icons';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useTheme } from '../contexts/ThemeContext';
 import LanguageSwitcher from './LanguageSwitcher';
 
 const { Header } = Layout;
@@ -14,6 +15,7 @@ const { useBreakpoint } = Grid;
 
 function Navigation({ currentSection, onSectionChange, user, onLoginClick, onLogout }) {
     const { t } = useLanguage();
+    const { isDark, toggleTheme } = useTheme();
     const screens = useBreakpoint();
     const isMobile = !screens.md;
     const [drawerOpen, setDrawerOpen] = useState(false);
@@ -83,9 +85,20 @@ function Navigation({ currentSection, onSectionChange, user, onLoginClick, onLog
         </Button>
     );
 
+    const themeButton = (
+        <Tooltip title={isDark ? 'Светлая тема' : 'Тёмная тема'}>
+            <Button
+                type="text"
+                icon={isDark ? <BulbFilled style={{ color: '#faad14' }} /> : <BulbOutlined />}
+                onClick={toggleTheme}
+                style={{ fontSize: 16 }}
+            />
+        </Tooltip>
+    );
+
     return (
         <Header style={{
-            background: '#fff',
+            background: isDark ? undefined : '#fff',
             padding: isMobile ? '0 16px' : '0 40px',
             borderBottom: '1px solid rgba(0,0,0,0.06)',
             display: 'flex',
@@ -104,6 +117,7 @@ function Navigation({ currentSection, onSectionChange, user, onLoginClick, onLog
                 <>
                     {/* Горизонтальное меню скрыто — вместо него Drawer */}
                     <div style={{ flex: 1 }} />
+                    {themeButton}
                     <LanguageSwitcher />
                     {userBlock}
                     <Button
@@ -140,6 +154,7 @@ function Navigation({ currentSection, onSectionChange, user, onLoginClick, onLog
                         style={{ flex: 1, border: 'none', fontSize: 14, fontWeight: 500 }}
                     />
                     <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        {themeButton}
                         <LanguageSwitcher />
                         {userBlock}
                     </div>

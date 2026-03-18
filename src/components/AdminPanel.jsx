@@ -6,13 +6,15 @@ import StructureManager from './StructureManager';
 import TheoryManager from './TheoryManager';
 import AdminLogin from './AdminLogin';
 import AdminStats from './AdminStats';
-import { BugOutlined, RocketOutlined, BarChartOutlined } from '@ant-design/icons';
+import BatchImportModal from './BatchImportModal';
+import { BugOutlined, RocketOutlined, BarChartOutlined, ImportOutlined } from '@ant-design/icons';
 
 const { Title } = Typography;
 
 function AdminPanel({ audioRecords, onAudioRecordsUpdate }) {
     const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [batchImportOpen, setBatchImportOpen] = useState(false);
     const [isTestMode, setIsTestMode] = useState(() => {
         return localStorage.getItem('webhookTestMode') === 'true';
     });
@@ -109,8 +111,19 @@ function AdminPanel({ audioRecords, onAudioRecordsUpdate }) {
         <div style={{ padding: '32px 0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
                 <Title level={2} style={{ margin: 0 }}>Управление</Title>
-                <Button onClick={handleLogout}>Выйти</Button>
+                <Space>
+                    <Button icon={<ImportOutlined />} onClick={() => setBatchImportOpen(true)}>
+                        Пакетный импорт
+                    </Button>
+                    <Button onClick={handleLogout}>Выйти</Button>
+                </Space>
             </div>
+
+            <BatchImportModal
+                open={batchImportOpen}
+                onClose={() => setBatchImportOpen(false)}
+                onSuccess={refreshRecords}
+            />
 
             <Tabs defaultActiveKey="1" items={items} />
         </div>

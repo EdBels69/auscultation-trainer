@@ -2,10 +2,9 @@ import { useState, useEffect, memo, useCallback, useMemo, lazy, Suspense } from 
 import { Layout, Spin, message } from 'antd';
 import Navigation from './components/Navigation';
 import AuthModal from './components/AuthModal';
-import ErrorBoundary from './components/ErrorBoundary';
 import { getSounds } from './services/api';
 import { supabase, getUserProfile, signOut } from './services/supabase';
-import { initAnalytics, endSession, trackPageView, resetAnalytics, getMyTestHistory } from './services/analytics';
+import { initAnalytics, endSession, trackPageView, resetAnalytics } from './services/analytics';
 
 const { Content } = Layout;
 
@@ -15,7 +14,6 @@ const AIChatSection = lazy(() => import('./components/AIChatSection'));
 const AdminPanel = lazy(() => import('./components/AdminPanel'));
 const TheorySection = lazy(() => import('./components/TheorySection'));
 const Dashboard = lazy(() => import('./components/Dashboard'));
-const ProfileSection = lazy(() => import('./components/ProfileSection'));
 
 function App() {
   const [currentSection, setCurrentSection] = useState('learning');
@@ -24,23 +22,6 @@ function App() {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [lastTestResult, setLastTestResult] = useState(null);
-
-  // Загружает lastTestResult из БД (последняя попытка)
-  const loadLastTestResult = useCallback(async () => {
-    try {
-      const history = await getMyTestHistory();
-      if (history.length > 0) {
-        const last = history[0];
-        setLastTestResult({
-          score:      last.score_percent,
-          mode:       last.details?.mode       || 'both',
-          difficulty: last.details?.difficulty || 'medium',
-          wrongCount: (last.total_count || 0) - (last.correct_count || 0),
-        });
-      }
-    } catch (_) {}
-  }, []);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -50,7 +31,6 @@ function App() {
         const profile = await getUserProfile();
         setUserProfile(profile);
         await initAnalytics();
-        await loadLastTestResult();
       }
     };
     initAuth();
@@ -62,7 +42,6 @@ function App() {
           const profile = await getUserProfile();
           setUserProfile(profile);
           await initAnalytics();
-          await loadLastTestResult();
         })();
       } else if (event === 'SIGNED_OUT') {
         (async () => {
@@ -70,7 +49,6 @@ function App() {
           resetAnalytics();
           setUser(null);
           setUserProfile(null);
-          setLastTestResult(null);
         })();
       }
     });
@@ -100,7 +78,7 @@ function App() {
   }, [currentSection, user]);
 
   const handleSectionChange = useCallback((section) => {
-    if ((section === 'chat' || section === 'test' || section === 'profile') && !user) {
+    if ((section === 'chat' || section === 'test') && !user) {
       message.info('Для доступа к этому разделу необходимо войти в систему');
       setAuthModalOpen(true);
       return;
@@ -129,11 +107,6 @@ function App() {
     const profile = await getUserProfile();
     setUserProfile(profile);
     await initAnalytics();
-    await loadLastTestResult();
-  }, [loadLastTestResult]);
-
-  const handleProfileUpdate = useCallback((updatedProfile) => {
-    setUserProfile(updatedProfile);
   }, []);
 
   const renderSection = useMemo(() => {
@@ -172,62 +145,54 @@ function App() {
       </div>
     );
 
-    const wrap = (children) => (
-      <ErrorBoundary key={currentSection}>
-        <Suspense fallback={<LoadingFallback />}>
-          {children}
-        </Suspense>
-      </ErrorBoundary>
-    );
-
     switch (currentSection) {
       case 'learning':
-        return wrap(<LearningSection audioRecords={audioRecords} />);
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <LearningSection audioRecords={audioRecords} />
+          </Suspense>
+        );
       case 'theory':
-        return wrap(<TheorySection />);
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <TheorySection />
+          </Suspense>
+        );
       case 'test':
-        return wrap(
-          <TestSection
-            audioRecords={audioRecords}
-            onTestComplete={(results, settings) =>
-              setLastTestResult({
-                score: results.score,
-                mode: settings.mode,
-                difficulty: settings.difficulty,
-                wrongCount: results.wrong,
-              })
-            }
-          />
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <TestSection audioRecords={audioRecords} />
+          </Suspense>
         );
       case 'chat':
-        return wrap(
-          <AIChatSection
-            userProfile={userProfile}
-            currentSection={currentSection}
-            lastTestResult={lastTestResult}
-          />
-        );
-      case 'profile':
-        return wrap(
-          <ProfileSection
-            userProfile={userProfile}
-            onProfileUpdate={handleProfileUpdate}
-          />
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <AIChatSection />
+          </Suspense>
         );
       case 'admin':
-        return wrap(
-          <AdminPanel
-            audioRecords={audioRecords}
-            onAudioRecordsUpdate={handleRecordsUpdate}
-            userProfile={userProfile}
-          />
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <AdminPanel
+              audioRecords={audioRecords}
+              onAudioRecordsUpdate={handleRecordsUpdate}
+            />
+          </Suspense>
         );
       case 'dashboard':
-        return wrap(<Dashboard />);
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <Dashboard />
+          </Suspense>
+        );
       default:
-        return wrap(<LearningSection audioRecords={audioRecords} />);
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <LearningSection audioRecords={audioRecords} />
+          </Suspense>
+        );
     }
-  }, [currentSection, audioRecords, loading, handleRecordsUpdate, userProfile, lastTestResult, handleProfileUpdate]);
+  }, [currentSection, audioRecords, loading, handleRecordsUpdate]);
 
   return (
     <Layout style={{ minHeight: '100vh' }}>

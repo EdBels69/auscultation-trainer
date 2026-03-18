@@ -1,0 +1,33 @@
+-- Run this in Supabase SQL Editor after running the migration:
+ALTER TABLE sounds
+  ADD COLUMN IF NOT EXISTS name_en TEXT,
+  ADD COLUMN IF NOT EXISTS description_en TEXT,
+  ADD COLUMN IF NOT EXISTS difficulty TEXT DEFAULT 'medium';
+
+UPDATE sounds SET name_en='Dry Wheezes - Variant 1 (Bronchial Asthma)', description_en='High-pitched whistling sounds caused by narrowed airways during an asthma attack, typically heard during expiration.', difficulty='easy' WHERE id='20';
+UPDATE sounds SET name_en='Dry Wheezes - Variant 2 (Bronchial Asthma)', description_en='Low-pitched rhonchi caused by mucus plugging or airway inflammation in asthma, often heard throughout the respiratory cycle.', difficulty='medium' WHERE id='21';
+UPDATE sounds SET name_en='Dry Wheezes - Variant 3 (Bronchial Asthma)', description_en='Polyphonic wheezes indicating variable airway obstruction in asthma, best heard during forced expiration.', difficulty='medium' WHERE id='22';
+UPDATE sounds SET name_en='Dry Wheezes - Variant 4 (COPD)', description_en='Coarse wheezes due to chronic airway inflammation and mucus production in COPD, often heard during both inspiration and expiration.', difficulty='medium' WHERE id='23';
+UPDATE sounds SET name_en='Dry Wheezes - Variant 5 (COPD)', description_en='Expiratory wheezes with prolonged expiratory phase, reflecting airflow limitation in advanced COPD.', difficulty='medium' WHERE id='24';
+UPDATE sounds SET name_en='Dry Wheezes with Decreased Vesicular Breathing (COPD)', description_en='Wheezes superimposed on diminished vesicular breath sounds, indicating severe airflow obstruction in COPD.', difficulty='hard' WHERE id='25';
+UPDATE sounds SET name_en='Dry Wheezes on Forced Expiration (COPD)', description_en='Wheezes heard only during forced exhalation, highlighting reversible airway obstruction in early COPD.', difficulty='medium' WHERE id='26';
+UPDATE sounds SET name_en='Amphoric Breathing (Lung Abscess)', description_en='Hollow, echoing breath sounds resembling blowing over a bottle, heard over a lung cavity due to an abscess.', difficulty='hard' WHERE id='27';
+UPDATE sounds SET name_en='Bronchial Breathing (Community-Acquired Lobar Pneumonia)', description_en='Harsh, tubular breath sounds with equal inspiration and expiration, heard over consolidated lung tissue in pneumonia.', difficulty='medium' WHERE id='28';
+UPDATE sounds SET name_en='Vesicular Breathing (Normal)', description_en='Soft, low-pitched breath sounds heard over healthy lung tissue, with inspiration longer than expiration.', difficulty='easy' WHERE id='29';
+UPDATE sounds SET name_en='Dry Rhonchi (COPD)', description_en='Low-pitched, snoring-like sounds caused by mucus in larger airways, typical in COPD exacerbations.', difficulty='medium' WHERE id='30';
+UPDATE sounds SET name_en='Fine Crackles (Interstitial Pulmonary Fibrosis)', description_en='High-pitched, discontinuous sounds like hair rubbing between fingers, heard at the lung bases due to fibrotic changes.', difficulty='medium' WHERE id='31';
+UPDATE sounds SET name_en='Fine Crackles (Community-Acquired Lobar Pneumonia)', description_en='Early inspiratory crackles over the affected lobe, caused by alveolar fluid and consolidation in pneumonia.', difficulty='medium' WHERE id='32';
+UPDATE sounds SET name_en='Fine Crackles (Hypersensitivity Pneumonitis)', description_en='Bilateral fine crackles at lung bases, reflecting interstitial inflammation and fibrosis in hypersensitivity pneumonitis.', difficulty='hard' WHERE id='33';
+UPDATE sounds SET name_en='Laryngotracheal Breathing (Normal)', description_en='Harsh, high-pitched breath sounds heard over the trachea and larynx, with a distinct inspiratory and expiratory phase.', difficulty='easy' WHERE id='34';
+UPDATE sounds SET name_en='Fine Crackles (Focal Pneumonia)', description_en='Discontinuous, high-pitched crackles over the affected lung segment, indicating alveolar filling in focal pneumonia.', difficulty='medium' WHERE id='35';
+UPDATE sounds SET name_en='Coarse Crackles (Pulmonary Edema due to Left Ventricular Failure)', description_en='Loud, bubbling sounds heard throughout the lungs, caused by fluid in the alveoli due to heart failure.', difficulty='medium' WHERE id='36';
+UPDATE sounds SET name_en='Medium-Pitched Crackles (Bronchiectasis)', description_en='Mid-pitched, gurgling crackles heard over areas of bronchiectasis, reflecting mucus in dilated airways.', difficulty='medium' WHERE id='37';
+UPDATE sounds SET name_en='Stridor (Laryngeal Edema)', description_en='High-pitched, inspiratory wheeze heard over the trachea, indicating upper airway obstruction due to laryngeal edema.', difficulty='easy' WHERE id='38';
+UPDATE sounds SET name_en='Mixed Adventitious Sounds: Crackles and Wheezes (Cardiac Asthma)', description_en='Combination of fine crackles and wheezes, reflecting pulmonary congestion and bronchospasm in heart failure.', difficulty='hard' WHERE id='39';
+UPDATE sounds SET name_en='Pleural Friction Rub (Dry Pleurisy)', description_en='Grating or creaking sounds heard during both inspiration and expiration, caused by inflamed pleural surfaces rubbing together.', difficulty='medium' WHERE id='40';
+UPDATE sounds SET name_en='Systolic Murmur (Aortic Stenosis)', description_en='Harsh, crescendo-decrescendo systolic murmur heard best at the right second intercostal space, radiating to the carotids.', difficulty='medium' WHERE id='41';
+UPDATE sounds SET name_en='Diastolic Murmur (Mitral Stenosis)', description_en='Low-pitched, rumbling diastolic murmur heard best at the apex with the bell of the stethoscope.', difficulty='medium' WHERE id='42';
+UPDATE sounds SET name_en='Loud First Heart Sound (Mitral Stenosis)', description_en='Accentuated S1 due to forceful closure of the mitral valve in mitral stenosis, heard best at the apex.', difficulty='medium' WHERE id='43';
+UPDATE sounds SET name_en='Systolic Murmur (Mitral Regurgitation)', description_en='Holosystolic, high-pitched murmur heard best at the apex, radiating to the axilla.', difficulty='medium' WHERE id='44';
+UPDATE sounds SET name_en='Continuous Murmur (Atrial Septal Defect)', description_en='Harsh, machinery-like murmur heard throughout systole and diastole, best heard at the left upper sternal border.', difficulty='hard' WHERE id='45';
+UPDATE sounds SET name_en='Combined Systolic and Diastolic Murmur (Combined Aortic Valve Disease)', description_en='To-and-fro murmur with both ejection systolic and early diastolic components, heard best at the right second intercostal space.', difficulty='hard' WHERE id='46';

@@ -66,13 +66,22 @@ export function generateTest(audioRecords, learningNodes = [], options = {}) {
         return [];
     }
 
+    // Фильтруем по сложности если задана конкретная (не 'both')
+    const difficultyFiltered = difficulty !== 'both'
+        ? validRecords.filter(r => !r.difficulty || r.difficulty === difficulty)
+        : validRecords;
+    // Если после фильтра записей слишком мало — используем все
+    const poolRecords = difficultyFiltered.length >= Math.min(count, 3)
+        ? difficultyFiltered
+        : validRecords;
+
     const nodeMap = {};
     learningNodes.forEach(node => {
         nodeMap[node.key] = node;
     });
 
-    const shuffled = [...validRecords].sort(() => Math.random() - 0.5);
-    const selected = shuffled.slice(0, Math.min(count, validRecords.length));
+    const shuffled = [...poolRecords].sort(() => Math.random() - 0.5);
+    const selected = shuffled.slice(0, Math.min(count, poolRecords.length));
 
     return selected.map((record, index) => {
         const linkedNode = record.linkedNodeKey ? nodeMap[record.linkedNodeKey] : null;
@@ -89,7 +98,7 @@ export function generateTest(audioRecords, learningNodes = [], options = {}) {
             position: record.auscultationPoint || null,
             correctAnswerId: record.id,
             answers: answers,
-            explanation: record.description || `Это ${record.name}`,
+            explanation: record.explanation || record.description || `Это ${record.name}`,
             category: record.category,
             difficulty,
             type: questionType,

@@ -1,0 +1,712 @@
+From 6c0635acecc9d12d4a235ab1bcafb0a30b60248c Mon Sep 17 00:00:00 2001
+From: Eduard <edbels69@gmail.com>
+Date: Wed, 11 Mar 2026 01:26:57 +0300
+Subject: [PATCH] feat: add analytics dashboard with recharts
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- New Dashboard.jsx component with 4 tabs: Обзор, Студенты,
+  Анализ ошибок, Экспорт
+- KPI cards, activity bar chart, score distribution, learning curve,
+  sound accuracy, confusion matrix (top errors), CSV export
+- Dashboard visible only to admin users in Navigation
+- Added recharts@2.12.7 dependency
+- Light Ant Design theme matching existing app style
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+---
+ package.json                  |   3 +-
+ src/App.jsx                   |  13 +-
+ src/components/Dashboard.jsx  | 595 ++++++++++++++++++++++++++++++++++
+ src/components/Navigation.jsx |   9 +-
+ 4 files changed, 616 insertions(+), 4 deletions(-)
+ create mode 100644 src/components/Dashboard.jsx
+
+diff --git a/package.json b/package.json
+index 822fa42..2fda2b2 100644
+--- a/package.json
++++ b/package.json
+@@ -30,7 +30,8 @@
+     "dayjs": "^1.11.19",
+     "react": "^19.2.0",
+     "react-dom": "^19.2.0",
+-    "wavesurfer.js": "^7.12.1"
++    "wavesurfer.js": "^7.12.1",
++    "recharts": "2.12.7"
+   },
+   "devDependencies": {
+     "@vitejs/plugin-react": "^5.1.1",
+diff --git a/src/App.jsx b/src/App.jsx
+index d825778..65733bf 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -13,6 +13,7 @@ const TestSection = lazy(() => import('./components/TestSection'));
+ const AIChatSection = lazy(() => import('./components/AIChatSection'));
+ const AdminPanel = lazy(() => import('./components/AdminPanel'));
+ const TheorySection = lazy(() => import('./components/TheorySection'));
++const Dashboard = lazy(() => import('./components/Dashboard'));
+ 
+ function App() {
+   const [currentSection, setCurrentSection] = useState('learning');
+@@ -82,8 +83,12 @@ function App() {
+       setAuthModalOpen(true);
+       return;
+     }
++    if (section === 'dashboard' && userProfile?.role !== 'admin') {
++      message.warning('Доступ только для администраторов');
++      return;
++    }
+     setCurrentSection(section);
+-  }, [user]);
++  }, [user, userProfile]);
+ 
+   const handleRecordsUpdate = useCallback((records) => {
+     setAudioRecords(records);
+@@ -174,6 +179,12 @@ function App() {
+             />
+           </Suspense>
+         );
++      case 'dashboard':
++        return (
++          <Suspense fallback={<LoadingFallback />}>
++            <Dashboard />
++          </Suspense>
++        );
+       default:
+         return (
+           <Suspense fallback={<LoadingFallback />}>
+diff --git a/src/components/Dashboard.jsx b/src/components/Dashboard.jsx
+new file mode 100644
+index 0000000..41e5b1b
+--- /dev/null
++++ b/src/components/Dashboard.jsx
+@@ -0,0 +1,595 @@
++import { useState, useEffect, useMemo } from 'react';
++import {
++  Card, Row, Col, Statistic, Tabs, Table, Tag, Space, Button,
++  Spin, Typography, Progress, Empty, Select, DatePicker, Alert
++} from 'antd';
++import {
++  UserOutlined, ExperimentOutlined, SoundOutlined, ClockCircleOutlined,
++  DownloadOutlined, ReloadOutlined, TrophyOutlined, WarningOutlined
++} from '@ant-design/icons';
++import {
++  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
++  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
++} from 'recharts';
++import { getAllStatisticsForAdmin, exportToCSV } from '../services/analytics';
++
++const { Title, Text } = Typography;
++const { RangePicker } = DatePicker;
++
++// ─── Colour palette ───────────────────────────────────────────────────────────
++const ACCENT = '#635bff';
++const COLORS = ['#635bff', '#00d4ff', '#52c41a', '#faad14', '#ff4d4f', '#722ed1'];
++const BG = '#f5f7fa';
++
++// ─── Helper: process raw Supabase data into dashboard metrics ────────────────
++function processData(raw) {
++  const { sessions = [], actions = [], testAttempts = [], profiles = [] } = raw;
++
++  // KPIs
++  const totalStudents = profiles.filter(p => p.role !== 'admin').length;
++  const totalSessions = sessions.length;
++  const totalAttempts = testAttempts.length;
++  const avgScore =
++    totalAttempts > 0
++      ? Math.round(testAttempts.reduce((s, a) => s + (a.score_percent || 0), 0) / totalAttempts)
++      : 0;
++
++  // Activity by day (last 30 days)
++  const now = new Date();
++  const dayMap = {};
++  for (let i = 29; i >= 0; i--) {
++    const d = new Date(now);
++    d.setDate(d.getDate() - i);
++    dayMap[d.toISOString().slice(0, 10)] = { date: d.toISOString().slice(0, 10), sessions: 0, tests: 0 };
++  }
++  sessions.forEach(s => {
++    const d = (s.started_at || '').slice(0, 10);
++    if (dayMap[d]) dayMap[d].sessions++;
++  });
++  testAttempts.forEach(a => {
++    const d = (a.completed_at || '').slice(0, 10);
++    if (dayMap[d]) dayMap[d].tests++;
++  });
++  const activityData = Object.values(dayMap).map(r => ({
++    ...r,
++    date: r.date.slice(5) // show MM-DD
++  }));
++
++  // Score distribution
++  const buckets = { '0-20': 0, '21-40': 0, '41-60': 0, '61-80': 0, '81-100': 0 };
++  testAttempts.forEach(a => {
++    const s = a.score_percent || 0;
++    if (s <= 20) buckets['0-20']++;
++    else if (s <= 40) buckets['21-40']++;
++    else if (s <= 60) buckets['41-60']++;
++    else if (s <= 80) buckets['61-80']++;
++    else buckets['81-100']++;
++  });
++  const scoreDistribution = Object.entries(buckets).map(([range, count]) => ({ range, count }));
++
++  // Sound accuracy: from test_attempts.details JSONB
++  const soundStats = {};
++  testAttempts.forEach(attempt => {
++    const details = attempt.details || [];
++    details.forEach(d => {
++      const name = d.audioName || d.sound_name || 'Unknown';
++      if (!soundStats[name]) soundStats[name] = { name, total: 0, correct: 0 };
++      soundStats[name].total++;
++      if (d.isCorrect) soundStats[name].correct++;
++    });
++  });
++  const soundAccuracy = Object.values(soundStats)
++    .map(s => ({ ...s, accuracy: s.total > 0 ? Math.round((s.correct / s.total) * 100) : 0 }))
++    .sort((a, b) => a.accuracy - b.accuracy);
++
++  // Error analysis: most confused pairs
++  const confusionMap = {};
++  testAttempts.forEach(attempt => {
++    const details = attempt.details || [];
++    details.forEach(d => {
++      if (!d.isCorrect && d.userAnswer && d.correctAnswer) {
++        const key = `${d.correctAnswer} → ${d.userAnswer}`;
++        confusionMap[key] = (confusionMap[key] || 0) + 1;
++      }
++    });
++  });
++  const confusionData = Object.entries(confusionMap)
++    .map(([pair, count]) => ({ pair, count }))
++    .sort((a, b) => b.count - a.count)
++    .slice(0, 10);
++
++  // Per-student stats
++  const studentMap = {};
++  profiles.filter(p => p.role !== 'admin').forEach(p => {
++    studentMap[p.anonymous_id] = {
++      key: p.anonymous_id,
++      name: p.display_name || p.anonymous_id?.slice(0, 8) + '...',
++      sessions: 0,
++      attempts: 0,
++      avgScore: 0,
++      lastSeen: null,
++      scores: []
++    };
++  });
++  sessions.forEach(s => {
++    if (studentMap[s.anonymous_id]) studentMap[s.anonymous_id].sessions++;
++  });
++  testAttempts.forEach(a => {
++    if (studentMap[a.anonymous_id]) {
++      const st = studentMap[a.anonymous_id];
++      st.attempts++;
++      st.scores.push(a.score_percent || 0);
++      if (!st.lastSeen || a.completed_at > st.lastSeen) st.lastSeen = a.completed_at;
++    }
++  });
++  const studentData = Object.values(studentMap).map(s => ({
++    ...s,
++    avgScore: s.scores.length > 0 ? Math.round(s.scores.reduce((a, b) => a + b, 0) / s.scores.length) : 0
++  }));
++
++  // Learning curve: average score over time
++  const byDay = {};
++  testAttempts.forEach(a => {
++    const d = (a.completed_at || '').slice(0, 10);
++    if (!byDay[d]) byDay[d] = [];
++    byDay[d].push(a.score_percent || 0);
++  });
++  const learningCurve = Object.entries(byDay)
++    .sort(([a], [b]) => a.localeCompare(b))
++    .slice(-30)
++    .map(([date, scores]) => ({
++      date: date.slice(5),
++      avgScore: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
++    }));
++
++  return {
++    kpi: { totalStudents, totalSessions, totalAttempts, avgScore },
++    activityData,
++    scoreDistribution,
++    soundAccuracy,
++    confusionData,
++    studentData,
++    learningCurve
++  };
++}
++
++// ─── Sub-components ──────────────────────────────────────────────────────────
++
++function KPICard({ icon, title, value, suffix, color }) {
++  return (
++    <Card style={{ borderRadius: 12, border: '1px solid #f0f0f0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
++      <Statistic
++        title={<Text style={{ fontSize: 13, color: '#8c8c8c' }}>{title}</Text>}
++        value={value}
++        suffix={suffix}
++        prefix={<span style={{ color, marginRight: 4 }}>{icon}</span>}
++        valueStyle={{ fontSize: 28, fontWeight: 700, color: '#1a1a2e' }}
++      />
++    </Card>
++  );
++}
++
++function OverviewTab({ data }) {
++  const { kpi, activityData, scoreDistribution, learningCurve } = data;
++
++  return (
++    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
++      <Row gutter={[16, 16]}>
++        <Col xs={24} sm={12} lg={6}>
++          <KPICard icon={<UserOutlined />} title="Студентов" value={kpi.totalStudents} color={ACCENT} />
++        </Col>
++        <Col xs={24} sm={12} lg={6}>
++          <KPICard icon={<ClockCircleOutlined />} title="Сессий" value={kpi.totalSessions} color="#00d4ff" />
++        </Col>
++        <Col xs={24} sm={12} lg={6}>
++          <KPICard icon={<ExperimentOutlined />} title="Тестов пройдено" value={kpi.totalAttempts} color="#52c41a" />
++        </Col>
++        <Col xs={24} sm={12} lg={6}>
++          <KPICard icon={<TrophyOutlined />} title="Средний балл" value={kpi.avgScore} suffix="%" color="#faad14" />
++        </Col>
++      </Row>
++
++      <Row gutter={[16, 16]}>
++        <Col xs={24} lg={14}>
++          <Card
++            title="Активность за 30 дней"
++            style={{ borderRadius: 12, border: '1px solid #f0f0f0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
++          >
++            {activityData.some(d => d.sessions > 0 || d.tests > 0) ? (
++              <ResponsiveContainer width="100%" height={220}>
++                <BarChart data={activityData} margin={{ left: -10 }}>
++                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
++                  <XAxis dataKey="date" tick={{ fontSize: 11 }} interval={4} />
++                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
++                  <Tooltip />
++                  <Legend />
++                  <Bar dataKey="sessions" name="Сессии" fill={ACCENT} radius={[3, 3, 0, 0]} />
++                  <Bar dataKey="tests" name="Тесты" fill="#00d4ff" radius={[3, 3, 0, 0]} />
++                </BarChart>
++              </ResponsiveContainer>
++            ) : (
++              <Empty description="Нет данных об активности" style={{ padding: '40px 0' }} />
++            )}
++          </Card>
++        </Col>
++
++        <Col xs={24} lg={10}>
++          <Card
++            title="Распределение баллов"
++            style={{ borderRadius: 12, border: '1px solid #f0f0f0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
++          >
++            {scoreDistribution.some(d => d.count > 0) ? (
++              <ResponsiveContainer width="100%" height={220}>
++                <BarChart data={scoreDistribution} margin={{ left: -10 }}>
++                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
++                  <XAxis dataKey="range" tick={{ fontSize: 12 }} />
++                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
++                  <Tooltip formatter={(v) => [v, 'Студентов']} />
++                  <Bar dataKey="count" name="Студентов" radius={[4, 4, 0, 0]}>
++                    {scoreDistribution.map((_, i) => (
++                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
++                    ))}
++                  </Bar>
++                </BarChart>
++              </ResponsiveContainer>
++            ) : (
++              <Empty description="Нет данных о тестах" style={{ padding: '40px 0' }} />
++            )}
++          </Card>
++        </Col>
++      </Row>
++
++      {learningCurve.length > 1 && (
++        <Card
++          title="Динамика среднего балла"
++          style={{ borderRadius: 12, border: '1px solid #f0f0f0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
++        >
++          <ResponsiveContainer width="100%" height={200}>
++            <LineChart data={learningCurve} margin={{ left: -10 }}>
++              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
++              <XAxis dataKey="date" tick={{ fontSize: 11 }} />
++              <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
++              <Tooltip formatter={(v) => [v + '%', 'Средний балл']} />
++              <Line
++                type="monotone"
++                dataKey="avgScore"
++                name="Средний балл"
++                stroke={ACCENT}
++                strokeWidth={2}
++                dot={{ r: 3 }}
++                activeDot={{ r: 5 }}
++              />
++            </LineChart>
++          </ResponsiveContainer>
++        </Card>
++      )}
++    </div>
++  );
++}
++
++function StudentsTab({ data }) {
++  const columns = [
++    {
++      title: 'Имя',
++      dataIndex: 'name',
++      key: 'name',
++      render: (name) => (
++        <Space>
++          <UserOutlined style={{ color: ACCENT }} />
++          <Text>{name}</Text>
++        </Space>
++      )
++    },
++    {
++      title: 'Сессий',
++      dataIndex: 'sessions',
++      key: 'sessions',
++      sorter: (a, b) => a.sessions - b.sessions,
++      align: 'center'
++    },
++    {
++      title: 'Тестов',
++      dataIndex: 'attempts',
++      key: 'attempts',
++      sorter: (a, b) => a.attempts - b.attempts,
++      align: 'center'
++    },
++    {
++      title: 'Средний балл',
++      dataIndex: 'avgScore',
++      key: 'avgScore',
++      sorter: (a, b) => a.avgScore - b.avgScore,
++      align: 'center',
++      render: (score) => {
++        const color = score >= 80 ? '#52c41a' : score >= 60 ? '#faad14' : '#ff4d4f';
++        return (
++          <Space direction="vertical" size={2} style={{ width: '100%', alignItems: 'center' }}>
++            <Text strong style={{ color }}>{score}%</Text>
++            <Progress percent={score} size="small" showInfo={false} strokeColor={color} style={{ width: 80 }} />
++          </Space>
++        );
++      }
++    },
++    {
++      title: 'Последняя активность',
++      dataIndex: 'lastSeen',
++      key: 'lastSeen',
++      render: (d) => d ? new Date(d).toLocaleDateString('ru-RU') : '—'
++    }
++  ];
++
++  return (
++    <Card style={{ borderRadius: 12, border: '1px solid #f0f0f0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
++      <Table
++        dataSource={data.studentData}
++        columns={columns}
++        rowKey="key"
++        pagination={{ pageSize: 15, showSizeChanger: false }}
++        locale={{ emptyText: <Empty description="Нет данных о студентах" /> }}
++        size="middle"
++      />
++    </Card>
++  );
++}
++
++function ErrorsTab({ data }) {
++  const { confusionData, soundAccuracy } = data;
++
++  return (
++    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
++      <Row gutter={[16, 16]}>
++        <Col xs={24} lg={12}>
++          <Card
++            title={<Space><WarningOutlined style={{ color: '#ff4d4f' }} />Топ ошибок</Space>}
++            style={{ borderRadius: 12, border: '1px solid #f0f0f0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
++          >
++            {confusionData.length > 0 ? (
++              <ResponsiveContainer width="100%" height={280}>
++                <BarChart
++                  data={confusionData}
++                  layout="vertical"
++                  margin={{ left: 10, right: 20 }}
++                >
++                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
++                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
++                  <YAxis
++                    type="category"
++                    dataKey="pair"
++                    tick={{ fontSize: 10 }}
++                    width={160}
++                  />
++                  <Tooltip formatter={(v) => [v, 'Ошибок']} />
++                  <Bar dataKey="count" name="Ошибок" fill="#ff4d4f" radius={[0, 4, 4, 0]} />
++                </BarChart>
++              </ResponsiveContainer>
++            ) : (
++              <Empty description="Нет данных об ошибках" style={{ padding: '40px 0' }} />
++            )}
++          </Card>
++        </Col>
++
++        <Col xs={24} lg={12}>
++          <Card
++            title={<Space><SoundOutlined style={{ color: ACCENT }} />Точность по звукам</Space>}
++            style={{ borderRadius: 12, border: '1px solid #f0f0f0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
++          >
++            {soundAccuracy.length > 0 ? (
++              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 280, overflowY: 'auto' }}>
++                {soundAccuracy.map((s) => (
++                  <div key={s.name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
++                    <Text style={{ width: 160, fontSize: 12, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.name}>
++                      {s.name}
++                    </Text>
++                    <Progress
++                      percent={s.accuracy}
++                      size="small"
++                      strokeColor={s.accuracy >= 70 ? '#52c41a' : s.accuracy >= 50 ? '#faad14' : '#ff4d4f'}
++                      style={{ flex: 1, marginBottom: 0 }}
++                    />
++                    <Text style={{ width: 40, fontSize: 12, textAlign: 'right', flexShrink: 0 }}>
++                      {s.accuracy}%
++                    </Text>
++                  </div>
++                ))}
++              </div>
++            ) : (
++              <Empty description="Нет данных о точности" style={{ padding: '40px 0' }} />
++            )}
++          </Card>
++        </Col>
++      </Row>
++
++      {soundAccuracy.length > 0 && (
++        <Card
++          title="Сложность звуков (точность распознавания)"
++          style={{ borderRadius: 12, border: '1px solid #f0f0f0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
++        >
++          <ResponsiveContainer width="100%" height={240}>
++            <BarChart data={soundAccuracy} margin={{ left: -10, bottom: 40 }}>
++              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
++              <XAxis
++                dataKey="name"
++                tick={{ fontSize: 10 }}
++                angle={-30}
++                textAnchor="end"
++                interval={0}
++                height={60}
++              />
++              <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
++              <Tooltip formatter={(v) => [v + '%', 'Точность']} />
++              <Bar dataKey="accuracy" name="Точность" radius={[4, 4, 0, 0]}>
++                {soundAccuracy.map((entry, i) => (
++                  <Cell
++                    key={i}
++                    fill={entry.accuracy >= 70 ? '#52c41a' : entry.accuracy >= 50 ? '#faad14' : '#ff4d4f'}
++                  />
++                ))}
++              </Bar>
++            </BarChart>
++          </ResponsiveContainer>
++        </Card>
++      )}
++    </div>
++  );
++}
++
++function ExportTab({ rawData }) {
++  const handleExport = (type) => {
++    switch (type) {
++      case 'attempts':
++        exportToCSV(rawData.testAttempts, 'test_attempts');
++        break;
++      case 'sessions':
++        exportToCSV(rawData.sessions, 'user_sessions');
++        break;
++      case 'actions':
++        exportToCSV(rawData.actions, 'user_actions');
++        break;
++      case 'profiles':
++        exportToCSV(rawData.profiles, 'user_profiles');
++        break;
++    }
++  };
++
++  const items = [
++    { type: 'attempts', label: 'Результаты тестов', count: rawData.testAttempts.length, color: '#52c41a' },
++    { type: 'sessions', label: 'Сессии пользователей', count: rawData.sessions.length, color: '#00d4ff' },
++    { type: 'actions', label: 'Действия пользователей', count: rawData.actions.length, color: ACCENT },
++    { type: 'profiles', label: 'Профили студентов', count: rawData.profiles.length, color: '#faad14' }
++  ];
++
++  return (
++    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
++      <Alert
++        message="Экспорт данных"
++        description="Данные экспортируются в формате CSV с кодировкой UTF-8 (BOM). Открывайте в Excel через Данные → Из текста/CSV."
++        type="info"
++        showIcon
++        style={{ borderRadius: 8 }}
++      />
++      <Row gutter={[16, 16]}>
++        {items.map(item => (
++          <Col xs={24} sm={12} key={item.type}>
++            <Card
++              style={{ borderRadius: 12, border: '1px solid #f0f0f0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
++            >
++              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
++                <div>
++                  <Text strong style={{ fontSize: 15 }}>{item.label}</Text>
++                  <br />
++                  <Text style={{ color: '#8c8c8c', fontSize: 13 }}>
++                    {item.count} {item.count === 1 ? 'запись' : item.count < 5 ? 'записи' : 'записей'}
++                  </Text>
++                </div>
++                <Button
++                  type="primary"
++                  ghost
++                  icon={<DownloadOutlined />}
++                  onClick={() => handleExport(item.type)}
++                  disabled={item.count === 0}
++                  style={{ borderColor: item.color, color: item.color }}
++                >
++                  CSV
++                </Button>
++              </div>
++            </Card>
++          </Col>
++        ))}
++      </Row>
++    </div>
++  );
++}
++
++// ─── Main Dashboard component ────────────────────────────────────────────────
++function Dashboard() {
++  const [rawData, setRawData] = useState(null);
++  const [loading, setLoading] = useState(true);
++  const [error, setError] = useState(null);
++  const [activeTab, setActiveTab] = useState('overview');
++
++  const load = async () => {
++    setLoading(true);
++    setError(null);
++    try {
++      const data = await getAllStatisticsForAdmin();
++      setRawData(data);
++    } catch (err) {
++      setError('Ошибка загрузки данных: ' + err.message);
++    } finally {
++      setLoading(false);
++    }
++  };
++
++  useEffect(() => { load(); }, []);
++
++  const processed = useMemo(() => rawData ? processData(rawData) : null, [rawData]);
++
++  const tabItems = processed
++    ? [
++        {
++          key: 'overview',
++          label: 'Обзор',
++          children: <OverviewTab data={processed} />
++        },
++        {
++          key: 'students',
++          label: `Студенты (${processed.kpi.totalStudents})`,
++          children: <StudentsTab data={processed} />
++        },
++        {
++          key: 'errors',
++          label: 'Анализ ошибок',
++          children: <ErrorsTab data={processed} />
++        },
++        {
++          key: 'export',
++          label: 'Экспорт',
++          children: <ExportTab rawData={rawData} />
++        }
++      ]
++    : [];
++
++  return (
++    <div style={{ padding: '24px 0', background: BG, minHeight: '100vh' }}>
++      <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
++        <div>
++          <Title level={3} style={{ margin: 0, color: '#1a1a2e' }}>
++            Аналитический дашборд
++          </Title>
++          <Text style={{ color: '#8c8c8c', fontSize: 13 }}>
++            Статистика использования тренажёра аускультации
++          </Text>
++        </div>
++        <Button
++          icon={<ReloadOutlined />}
++          onClick={load}
++          loading={loading}
++          style={{ borderRadius: 8 }}
++        >
++          Обновить
++        </Button>
++      </div>
++
++      {error && (
++        <Alert message={error} type="error" showIcon style={{ marginBottom: 20, borderRadius: 8 }} closable />
++      )}
++
++      {loading ? (
++        <div style={{ textAlign: 'center', padding: '80px 0' }}>
++          <Spin size="large" />
++          <div style={{ marginTop: 16, color: '#8c8c8c' }}>Загрузка статистики...</div>
++        </div>
++      ) : (
++        <Tabs
++          activeKey={activeTab}
++          onChange={setActiveTab}
++          items={tabItems}
++          style={{ background: 'transparent' }}
++          tabBarStyle={{ marginBottom: 20 }}
++        />
++      )}
++    </div>
++  );
++}
++
++export default Dashboard;
+diff --git a/src/components/Navigation.jsx b/src/components/Navigation.jsx
+index 6181cbf..9fba397 100644
+--- a/src/components/Navigation.jsx
++++ b/src/components/Navigation.jsx
+@@ -1,5 +1,5 @@
+ import { Layout, Menu, Typography, Button, Space, Dropdown, Avatar } from 'antd';
+-import { BookOutlined, FileTextOutlined, SettingOutlined, ReadOutlined, MessageOutlined, UserOutlined, LogoutOutlined } from '@ant-design/icons';
++import { BookOutlined, FileTextOutlined, SettingOutlined, ReadOutlined, MessageOutlined, UserOutlined, LogoutOutlined, BarChartOutlined } from '@ant-design/icons';
+ import { useLanguage } from '../contexts/LanguageContext';
+ import LanguageSwitcher from './LanguageSwitcher';
+ 
+@@ -9,12 +9,17 @@ const { Title, Text } = Typography;
+ function Navigation({ currentSection, onSectionChange, user, onLoginClick, onLogout }) {
+     const { t } = useLanguage();
+ 
++    const isAdmin = user?.role === 'admin';
++
+     const items = [
+         { key: 'learning', label: t('nav.learning'), icon: <BookOutlined /> },
+         { key: 'theory', label: t('nav.theory'), icon: <ReadOutlined /> },
+         { key: 'test', label: t('testing.title'), icon: <FileTextOutlined /> },
+         { key: 'chat', label: t('nav.aiChat'), icon: <MessageOutlined /> },
+-        { key: 'admin', label: t('nav.admin'), icon: <SettingOutlined /> },
++        ...(isAdmin ? [
++            { key: 'dashboard', label: 'Дашборд', icon: <BarChartOutlined /> },
++            { key: 'admin', label: t('nav.admin'), icon: <SettingOutlined /> },
++        ] : []),
+     ];
+ 
+     const userMenuItems = [
+-- 
+2.34.1
+
