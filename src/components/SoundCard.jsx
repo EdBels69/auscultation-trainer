@@ -5,7 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 const { Text } = Typography;
 
 function SoundCard({ record, isSelected, onClick }) {
-    const { lang } = useLanguage();
+    const lang = useLanguage();
     const styles = {
         card: {
             display: 'flex',
