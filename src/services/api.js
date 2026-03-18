@@ -54,7 +54,6 @@ export async function getSounds(forceRefresh = false) {
     return sounds;
 }
 
-// Add a new sound with audio file and optional image
 // Add a new sound with audio file and optional image and audiogram
 export async function addSound(soundData, file, imageFile = null, audiogramFile = null) {
     // Sanitize filename - remove non-ASCII characters
@@ -125,7 +124,6 @@ export async function addSound(soundData, file, imageFile = null, audiogramFile 
             file_path: filePath,
             file_name: file.name,
             image_url: imageUrl,
-            image_url: imageUrl,
             audiogram_url: audiogramUrl,
             linked_node_key: soundData.linked_node_key
         })
@@ -164,7 +162,6 @@ export async function updateSound(id, updates) {
     return data;
 }
 
-// Update a sound with optional new audio/image files
 // Update a sound with optional new audio/image/audiogram files
 export async function updateSoundWithFile(id, updates, audioFile = null, imageFile = null, audiogramFile = null, oldFilePath = null) {
     // Sanitize filename helper
@@ -239,7 +236,6 @@ export async function updateSoundWithFile(id, updates, audioFile = null, imageFi
             category: updates.category,
             position: updates.position,
             file_path: newFilePath,
-            file_name: audioFile ? audioFile.name : updates.file_name,
             file_name: audioFile ? audioFile.name : updates.file_name,
             image_url: newImageUrl,
             audiogram_url: newAudiogramUrl,

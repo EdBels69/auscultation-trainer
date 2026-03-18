@@ -5,7 +5,7 @@
 
 const ROUTERAI_URL = 'https://routerai.ru/api/v1/chat/completions';
 const MODEL = 'mistralai/mistral-small-2603'; // ~5-7s response, no reasoning overhead
-const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://auscultation-trainer.ru';
+const SITE_URL = import.meta.env.VITE_SITE_URL || window.location.origin;
 
 function getApiKey() {
     return import.meta.env.VITE_OPENROUTER_API_KEY || import.meta.env.VITE_AI_API_KEY || '';
