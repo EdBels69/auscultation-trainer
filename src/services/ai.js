@@ -1,13 +1,13 @@
 /**
  * AI service — RouterAI
  * Default model: deepseek/deepseek-v3.2
- * Quiz model: minimax/minimax-2.7 (fast, free on RouterAI)
+ * Quiz model: google/gemini-flash-2.0 (fast)
  * Endpoint: https://routerai.ru/api/v1 (OpenAI-compatible)
  */
 
 const ROUTERAI_URL = 'https://routerai.ru/api/v1/chat/completions';
 const MODEL = 'deepseek/deepseek-v3.2'; // chat, explanations
-const QUIZ_MODEL = 'minimax/minimax-2.7'; // fast & free — quiz generation
+const QUIZ_MODEL = 'google/gemini-flash-2.0'; // fast — quiz generation
 const SITE_URL = import.meta.env.VITE_SITE_URL || window.location.origin;
 
 /**
