@@ -35,7 +35,7 @@ export function generateQuestion(audioRecords, type = null, usedRecordIds = new 
         case QUESTION_TYPES.IDENTIFY_SOUND:
             return {
                 type: questionType,
-                question: 'Какой звук вы слышите?',
+                question: getRandomSoundQuestion(),
                 audioUrl: correctAnswer.audioUrl,
                 imageUrl: correctAnswer.imageUrl || null,
                 audiogramUrl: correctAnswer.audiogramUrl || null,
@@ -128,13 +128,27 @@ export function calculateResults(questions, userAnswers) {
 }
 
 // Helper functions
+// 70% IDENTIFY_SOUND, 30% IDENTIFY_POSITION
 function getRandomQuestionType() {
-    const types = Object.values(QUESTION_TYPES);
-    return types[Math.floor(Math.random() * types.length)];
+    return Math.random() < 0.7
+        ? QUESTION_TYPES.IDENTIFY_SOUND
+        : QUESTION_TYPES.IDENTIFY_POSITION;
 }
 
 function getRandomRecord(records) {
     return records[Math.floor(Math.random() * records.length)];
+}
+
+const SOUND_QUESTIONS = [
+    'Какой аускультативный феномен вы слышите?',
+    'Определите аускультативный феномен:',
+    'Какой звук выслушивается?',
+    'Какой аускультативный феномен наиболее вероятен?',
+    'Что вы слышите при аускультации?',
+];
+
+function getRandomSoundQuestion() {
+    return SOUND_QUESTIONS[Math.floor(Math.random() * SOUND_QUESTIONS.length)];
 }
 
 /**

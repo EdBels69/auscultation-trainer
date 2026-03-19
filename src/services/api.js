@@ -12,21 +12,31 @@ export async function getSounds(forceRefresh = false) {
         return soundsCache;
     }
 
-    const { data, error } = await supabase
-        .from('sounds')
-        .select('*')
-        .order('created_at', { ascending: false });
+    // Fetch sounds and linked learning_nodes in parallel
+    const [soundsRes, nodesRes] = await Promise.all([
+        supabase.from('sounds').select('*').order('created_at', { ascending: false }),
+        supabase.from('learning_nodes').select('key, image_url, audiogram_url, name'),
+    ]);
 
-    if (error) throw error;
+    if (soundsRes.error) throw soundsRes.error;
+
+    // Build a lookup: node key → node data (for images)
+    const nodeMap = {};
+    if (!nodesRes.error && nodesRes.data) {
+        nodesRes.data.forEach(n => { nodeMap[n.key] = n; });
+    }
 
     // Map to match application structure
-    const sounds = data.map(item => {
+    const sounds = soundsRes.data.map(item => {
         // Use direct audio_url if present (legacy records from old project),
         // otherwise construct from file_path via current Supabase storage
         const audioUrl = item.audio_url
             || (item.file_path
                 ? supabase.storage.from('sounds').getPublicUrl(item.file_path).data.publicUrl
                 : null);
+
+        // Enrich with learning_node image if the sound itself has no image
+        const linkedNode = item.linked_node_key ? nodeMap[item.linked_node_key] : null;
 
         return {
             id: item.id,
@@ -37,11 +47,11 @@ export async function getSounds(forceRefresh = false) {
             difficulty: item.difficulty || 'medium',
             audioUrl: audioUrl,
             filePath: item.file_path,
-            imageUrl: item.image_url,
+            imageUrl: item.image_url || (linkedNode?.image_url ?? null),
             fileName: item.file_name,
             createdAt: item.created_at,
             linkedNodeKey: item.linked_node_key,
-            audiogramUrl: item.audiogram_url
+            audiogramUrl: item.audiogram_url || (linkedNode?.audiogram_url ?? null)
         };
     });
 
