@@ -6,8 +6,8 @@
  */
 
 const ROUTERAI_URL = 'https://routerai.ru/api/v1/chat/completions';
-const MODEL = 'deepseek/deepseek-v3.2'; // chat, explanations
-const QUIZ_MODEL = 'qwen/qwen3.5-flash-02-23'; // fast — quiz generation
+const MODEL = 'qwen/qwen3.5-plus-02-15'; // all AI features
+const QUIZ_MODEL = MODEL;
 const SITE_URL = import.meta.env.VITE_SITE_URL || window.location.origin;
 
 /**
