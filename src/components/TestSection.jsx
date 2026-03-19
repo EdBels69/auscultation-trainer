@@ -1,11 +1,13 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Card, Button, Radio, Typography, Progress, Space, Alert, Statistic, Row, Col, Select, message as antMessage } from 'antd';
 import {
     PlayCircleOutlined,
+    PauseCircleOutlined,
     CheckCircleOutlined,
     CloseCircleOutlined,
     TrophyOutlined,
-    ReloadOutlined
+    ReloadOutlined,
+    LockOutlined
 } from '@ant-design/icons';
 import { generateTest, calculateResults } from '../utils/testGenerator';
 import { supabase } from '../services/supabase';
@@ -30,10 +32,52 @@ function TestSection({ audioRecords, user }) {
     const [results, setResults] = useState(null);
     const [sessionType, setSessionType] = useState('practice');
     const [startTime, setStartTime] = useState(null);
+    const [isPlaying, setIsPlaying] = useState(false);
     const audioRef = useRef(null);
 
     const minRecordsRequired = 5;
     const questionsPerTest = 10;
+
+    // Stop and reset audio when question changes
+    useEffect(() => {
+        const audio = audioRef.current;
+        if (audio) {
+            audio.pause();
+            audio.currentTime = 0;
+            setIsPlaying(false);
+        }
+    }, [currentQuestionIndex]);
+
+    // Track audio play/pause/ended events
+    useEffect(() => {
+        const audio = audioRef.current;
+        if (!audio) return;
+
+        const onPlay = () => setIsPlaying(true);
+        const onPause = () => setIsPlaying(false);
+        const onEnded = () => setIsPlaying(false);
+
+        audio.addEventListener('play', onPlay);
+        audio.addEventListener('pause', onPause);
+        audio.addEventListener('ended', onEnded);
+
+        return () => {
+            audio.removeEventListener('play', onPlay);
+            audio.removeEventListener('pause', onPause);
+            audio.removeEventListener('ended', onEnded);
+        };
+    }, [testStarted]);
+
+    // Cleanup audio on unmount
+    useEffect(() => {
+        return () => {
+            const audio = audioRef.current;
+            if (audio) {
+                audio.pause();
+                audio.currentTime = 0;
+            }
+        };
+    }, []);
 
     const startTest = () => {
         const test = generateTest(audioRecords, questionsPerTest);
@@ -45,6 +89,7 @@ function TestSection({ audioRecords, user }) {
         setResults(null);
         setStartTime(Date.now());
         setTestStarted(true);
+        setIsPlaying(false);
     };
 
     const handleAnswer = (answerId) => {
@@ -65,6 +110,12 @@ function TestSection({ audioRecords, user }) {
     };
 
     const finishTest = async () => {
+        // Stop audio
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+        }
+
         const testResults = calculateResults(questions, userAnswers);
         setResults(testResults);
         setTestCompleted(true);
@@ -99,11 +150,33 @@ function TestSection({ audioRecords, user }) {
         }
     };
 
-    const playAudio = () => {
-        if (audioRef.current) {
-            audioRef.current.play();
+    const toggleAudio = useCallback(() => {
+        const audio = audioRef.current;
+        if (!audio) return;
+        if (audio.paused) {
+            audio.play().catch(() => {});
+        } else {
+            audio.pause();
+            audio.currentTime = 0;
         }
-    };
+    }, []);
+
+    // Auth gate — require login
+    if (!user) {
+        return (
+            <div style={{ padding: '32px 0' }}>
+                <Title level={2}>Тестирование знаний</Title>
+                <Card style={{ maxWidth: 600, marginTop: 24, textAlign: 'center' }}>
+                    <LockOutlined style={{ fontSize: 48, color: '#8c8c8c', marginBottom: 16 }} />
+                    <Title level={4}>Требуется авторизация</Title>
+                    <Paragraph type="secondary">
+                        Для прохождения теста необходимо войти в аккаунт или зарегистрироваться.
+                        Результаты тестирования сохраняются в вашем профиле.
+                    </Paragraph>
+                </Card>
+            </div>
+        );
+    }
 
     if (audioRecords.length < minRecordsRequired) {
         return (
@@ -129,7 +202,7 @@ function TestSection({ audioRecords, user }) {
                         <div>
                             <Title level={4}>Проверьте свои знания!</Title>
                             <Paragraph type="secondary">
-                                Тест состоит из {questionsPerTest} вопросов. Вам нужно определить звук, точку аускультации или категорию.
+                                Тест состоит из {questionsPerTest} вопросов. Вам нужно определить звук или точку аускультации.
                             </Paragraph>
                             <Paragraph type="secondary">
                                 • Доступно записей: {audioRecords.length}<br />
@@ -137,20 +210,18 @@ function TestSection({ audioRecords, user }) {
                                 • Вы можете прослушать каждый звук несколько раз
                             </Paragraph>
                         </div>
-                        {user && (
-                            <div>
-                                <Text strong style={{ display: 'block', marginBottom: 8 }}>Тип сессии (НИР):</Text>
-                                <Select
-                                    value={sessionType}
-                                    onChange={setSessionType}
-                                    style={{ width: '100%' }}
-                                    options={SESSION_TYPES}
-                                />
-                                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
-                                    T1/T2/T3 — результат записывается в базу для НИР. Практика не сохраняется.
-                                </Text>
-                            </div>
-                        )}
+                        <div>
+                            <Text strong style={{ display: 'block', marginBottom: 8 }}>Тип сессии (НИР):</Text>
+                            <Select
+                                value={sessionType}
+                                onChange={setSessionType}
+                                style={{ width: '100%' }}
+                                options={SESSION_TYPES}
+                            />
+                            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
+                                T1/T2/T3 — результат записывается в базу для НИР. Практика не сохраняется.
+                            </Text>
+                        </div>
                         <Button
                             type="primary"
                             size="large"
@@ -267,20 +338,80 @@ function TestSection({ audioRecords, user }) {
             </div>
 
             <Card style={{ maxWidth: 800 }}>
-                <audio ref={audioRef} src={currentQuestion?.audioUrl} />
+                <audio ref={audioRef} src={currentQuestion?.audioUrl} preload="auto" />
 
                 <Space direction="vertical" size="large" style={{ width: '100%' }}>
                     <div>
                         <Title level={4}>{currentQuestion?.question}</Title>
+
+                        {/* Audio play/stop button */}
                         <Button
                             type="primary"
-                            icon={<PlayCircleOutlined />}
-                            onClick={playAudio}
+                            icon={isPlaying ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
+                            onClick={toggleAudio}
                             style={{ marginTop: 8 }}
                         >
-                            Прослушать звук
+                            {isPlaying ? 'Остановить' : 'Прослушать звук'}
                         </Button>
                     </div>
+
+                    {/* Auscultation point image */}
+                    {currentQuestion?.imageUrl && (
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            background: '#fff',
+                            border: '1px solid #e3e8ee',
+                            borderRadius: 8,
+                            padding: 16
+                        }}>
+                            <img
+                                src={currentQuestion.imageUrl}
+                                alt="Точка аускультации"
+                                style={{
+                                    maxWidth: '100%',
+                                    maxHeight: 280,
+                                    objectFit: 'contain',
+                                    borderRadius: 4
+                                }}
+                            />
+                        </div>
+                    )}
+
+                    {/* Audiogram if available */}
+                    {currentQuestion?.audiogramUrl && (
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            background: '#fff',
+                            border: '1px solid #e3e8ee',
+                            borderRadius: 8,
+                            padding: 16
+                        }}>
+                            <div>
+                                <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>Аудиограмма:</Text>
+                                <img
+                                    src={currentQuestion.audiogramUrl}
+                                    alt="Аудиограмма"
+                                    style={{
+                                        maxWidth: '100%',
+                                        maxHeight: 200,
+                                        objectFit: 'contain',
+                                        borderRadius: 4
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Position info */}
+                    {currentQuestion?.position && currentQuestion.type !== 'identify_position' && (
+                        <Text type="secondary">
+                            Точка аускультации: {currentQuestion.position}
+                        </Text>
+                    )}
 
                     <Radio.Group
                         value={userAnswer}
@@ -341,7 +472,7 @@ function TestSection({ audioRecords, user }) {
                     )}
                 </Space>
             </Card>
-        </div >
+        </div>
     );
 }
 

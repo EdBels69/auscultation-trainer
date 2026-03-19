@@ -1,11 +1,13 @@
 /**
- * AI service — RouterAI → DeepSeek V3.2
- * Model: deepseek/deepseek-v3.2
+ * AI service — RouterAI
+ * Default model: deepseek/deepseek-v3.2
+ * Quiz model: minimax/minimax-2.7 (fast, free on RouterAI)
  * Endpoint: https://routerai.ru/api/v1 (OpenAI-compatible)
  */
 
 const ROUTERAI_URL = 'https://routerai.ru/api/v1/chat/completions';
-const MODEL = 'deepseek/deepseek-v3.2'; // fast, affordable, optimal for medical content
+const MODEL = 'deepseek/deepseek-v3.2'; // chat, explanations
+const QUIZ_MODEL = 'minimax/minimax-2.7'; // fast & free — quiz generation
 const SITE_URL = import.meta.env.VITE_SITE_URL || window.location.origin;
 
 /**
@@ -48,7 +50,7 @@ async function chatCompletion(messages, options = {}) {
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 45000);
+    const timeout = setTimeout(() => controller.abort(), 120000);
 
     let response;
     try {
@@ -98,12 +100,12 @@ export async function generateQuizQuestions({ count = 5, category = 'all', diffi
            'кардиологии и пульмонологии');
 
     const diffLabel = isEnglish
-        ? (difficulty === 'easy' ? 'basic level (1-2 year medical students)' :
-           difficulty === 'hard' ? 'advanced level (residents, doctors)' :
-           'intermediate level (3-5 year medical students)')
-        : (difficulty === 'easy' ? 'базового уровня (1-2 курс медвуза)' :
-           difficulty === 'hard' ? 'продвинутого уровня (ординатура, врачи)' :
-           'среднего уровня (3-5 курс медвуза)');
+        ? (difficulty === 'easy' ? 'basic level' :
+           difficulty === 'hard' ? 'advanced level' :
+           'intermediate level')
+        : (difficulty === 'easy' ? 'базового уровня' :
+           difficulty === 'hard' ? 'продвинутого уровня' :
+           'среднего уровня');
 
     // Include real sound names from DB for context-aware questions
     const soundContext = soundRecords.length > 0
@@ -154,10 +156,13 @@ export async function generateQuizQuestions({ count = 5, category = 'all', diffi
   ]
 }`;
 
+    // Scale max_tokens based on question count (each question ~200 tokens)
+    const estimatedTokens = Math.max(2000, count * 400);
+
     const content = await chatCompletion([
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
-    ], { temperature: 0.4, max_tokens: 2000, raw: true });
+    ], { model: QUIZ_MODEL, temperature: 0.4, max_tokens: estimatedTokens, raw: true });
 
     // Parse JSON — strip markdown if present
     const jsonStr = content.replace(/```(?:json)?\s*([\s\S]*?)```/g, '$1').trim();

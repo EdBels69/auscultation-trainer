@@ -136,7 +136,7 @@ function App() {
       case 'aiquiz':
         return (
           <Suspense fallback={<LoadingFallback />}>
-            <AIQuizSection />
+            <AIQuizSection user={user} />
           </Suspense>
         );
       case 'chat':

@@ -5,22 +5,31 @@
 
 export const QUESTION_TYPES = {
     IDENTIFY_SOUND: 'identify_sound',
-    IDENTIFY_POSITION: 'identify_position',
-    IDENTIFY_CATEGORY: 'identify_category'
+    IDENTIFY_POSITION: 'identify_position'
 };
 
 /**
  * Generate a random question from audio records
+ * @param {Array} audioRecords - available records
+ * @param {string|null} type - question type or null for random
+ * @param {Set} usedRecordIds - IDs already used as correct answers (to avoid duplication)
  */
-export function generateQuestion(audioRecords, type = null) {
+export function generateQuestion(audioRecords, type = null, usedRecordIds = new Set()) {
     if (!audioRecords || audioRecords.length < 3) {
         return null;
     }
 
+    // Filter out already-used records for the correct answer
+    const availableForCorrect = audioRecords.filter(r => !usedRecordIds.has(r.id));
+    if (availableForCorrect.length === 0) return null;
+
     const questionType = type || getRandomQuestionType();
-    const correctAnswer = getRandomRecord(audioRecords);
-    const wrongAnswers = getWrongAnswers(audioRecords, correctAnswer, 3);
-    const allAnswers = shuffleArray([correctAnswer, ...wrongAnswers]);
+    const correctAnswer = getRandomRecord(availableForCorrect);
+    const wrongAnswers = getWrongAnswers(audioRecords, correctAnswer, 3, questionType);
+    const allAnswers = shuffleArray([
+        { ...correctAnswer, _isCorrect: true },
+        ...wrongAnswers.map(r => ({ ...r, _isCorrect: false }))
+    ]);
 
     switch (questionType) {
         case QUESTION_TYPES.IDENTIFY_SOUND:
@@ -28,10 +37,13 @@ export function generateQuestion(audioRecords, type = null) {
                 type: questionType,
                 question: 'Какой звук вы слышите?',
                 audioUrl: correctAnswer.audioUrl,
+                imageUrl: correctAnswer.imageUrl || null,
+                audiogramUrl: correctAnswer.audiogramUrl || null,
+                position: correctAnswer.position || null,
                 answers: allAnswers.map(r => ({
                     id: r.id,
                     text: r.name,
-                    isCorrect: r.id === correctAnswer.id
+                    isCorrect: r._isCorrect
                 })),
                 correctAnswerId: correctAnswer.id,
                 explanation: correctAnswer.description
@@ -42,34 +54,16 @@ export function generateQuestion(audioRecords, type = null) {
                 type: questionType,
                 question: `Где выслушивается звук "${correctAnswer.name}"?`,
                 audioUrl: correctAnswer.audioUrl,
+                imageUrl: correctAnswer.imageUrl || null,
+                audiogramUrl: correctAnswer.audiogramUrl || null,
+                position: correctAnswer.position || null,
                 answers: allAnswers.map(r => ({
                     id: r.id,
                     text: r.position,
-                    isCorrect: r.id === correctAnswer.id
+                    isCorrect: r._isCorrect
                 })),
                 correctAnswerId: correctAnswer.id,
                 explanation: `${correctAnswer.name} выслушивается в точке: ${correctAnswer.position}`
-            };
-
-        case QUESTION_TYPES.IDENTIFY_CATEGORY:
-            return {
-                type: questionType,
-                question: `К какой категории относится звук "${correctAnswer.name}"?`,
-                audioUrl: correctAnswer.audioUrl,
-                answers: [
-                    {
-                        id: 'cardiac',
-                        text: 'Кардиология',
-                        isCorrect: correctAnswer.category === 'cardiac'
-                    },
-                    {
-                        id: 'pulmonary',
-                        text: 'Пульмонология',
-                        isCorrect: correctAnswer.category === 'pulmonary'
-                    }
-                ],
-                correctAnswerId: correctAnswer.category,
-                explanation: correctAnswer.description
             };
 
         default:
@@ -82,19 +76,19 @@ export function generateQuestion(audioRecords, type = null) {
  */
 export function generateTest(audioRecords, numberOfQuestions = 10) {
     const questions = [];
-    const usedRecords = new Set();
+    const usedRecordIds = new Set();
 
-    while (questions.length < numberOfQuestions && usedRecords.size < audioRecords.length) {
+    // Cap to available records (each record used at most once as the correct answer)
+    const maxQuestions = Math.min(numberOfQuestions, audioRecords.length);
+
+    while (questions.length < maxQuestions) {
         const type = getRandomQuestionType();
-        const availableRecords = audioRecords.filter(r => !usedRecords.has(r.id));
+        const question = generateQuestion(audioRecords, type, usedRecordIds);
 
-        if (availableRecords.length < 3) break;
+        if (!question) break; // no more available records
 
-        const question = generateQuestion(availableRecords, type);
-        if (question) {
-            questions.push(question);
-            usedRecords.add(question.correctAnswerId);
-        }
+        questions.push(question);
+        usedRecordIds.add(question.correctAnswerId);
     }
 
     return questions;
@@ -143,9 +137,32 @@ function getRandomRecord(records) {
     return records[Math.floor(Math.random() * records.length)];
 }
 
-function getWrongAnswers(allRecords, correctRecord, count) {
+/**
+ * Get wrong answers, deduplicating by display text to avoid
+ * showing the same position/name twice
+ */
+function getWrongAnswers(allRecords, correctRecord, count, questionType) {
     const wrong = allRecords.filter(r => r.id !== correctRecord.id);
-    return shuffleArray(wrong).slice(0, count);
+    const shuffled = shuffleArray(wrong);
+
+    // Deduplicate by the text field that will be displayed
+    const seen = new Set();
+    const correctText = questionType === QUESTION_TYPES.IDENTIFY_POSITION
+        ? correctRecord.position
+        : correctRecord.name;
+    seen.add(correctText);
+
+    const result = [];
+    for (const record of shuffled) {
+        const text = questionType === QUESTION_TYPES.IDENTIFY_POSITION
+            ? record.position
+            : record.name;
+        if (!text || seen.has(text)) continue;
+        seen.add(text);
+        result.push(record);
+        if (result.length >= count) break;
+    }
+    return result;
 }
 
 function shuffleArray(array) {

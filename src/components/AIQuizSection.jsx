@@ -1,20 +1,22 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card, Button, Radio, Typography, Progress, Space, Alert, Statistic, Row, Col, Select, Spin } from 'antd';
 import {
     PlayCircleOutlined,
+    PauseCircleOutlined,
     CheckCircleOutlined,
     CloseCircleOutlined,
     TrophyOutlined,
     ReloadOutlined,
     RobotOutlined,
-    SoundOutlined
+    SoundOutlined,
+    LockOutlined
 } from '@ant-design/icons';
 import { generateQuizQuestions } from '../services/ai';
 import './AIQuizSection.css';
 
 const { Title, Text, Paragraph } = Typography;
 
-function AIQuizSection() {
+function AIQuizSection({ user }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [testStarted, setTestStarted] = useState(false);
@@ -27,14 +29,35 @@ function AIQuizSection() {
     const [questionCount, setQuestionCount] = useState(5);
     const [category, setCategory] = useState('all');
     const [difficulty, setDifficulty] = useState('medium');
+    const [isPlaying, setIsPlaying] = useState(false);
     const audioRef = useRef(null);
+
+    // Stop audio when question changes
+    useEffect(() => {
+        const audio = audioRef.current;
+        if (audio) {
+            audio.pause();
+            audio.currentTime = 0;
+            setIsPlaying(false);
+        }
+    }, [currentQuestionIndex]);
+
+    // Cleanup audio on unmount
+    useEffect(() => {
+        return () => {
+            const audio = audioRef.current;
+            if (audio) {
+                audio.pause();
+                audio.currentTime = 0;
+            }
+        };
+    }, []);
 
     const generateQuiz = async () => {
         setLoading(true);
         setError(null);
 
         try {
-            // Use OpenRouter/DeepSeek directly — no n8n dependency
             const rawQuestions = await generateQuizQuestions({
                 count: questionCount,
                 category,
@@ -76,7 +99,7 @@ function AIQuizSection() {
         } catch (err) {
             console.error('Quiz generation error:', err.message || err);
             const msg = err.name === 'AbortError'
-                ? 'Превышено время ожидания (45с). Попробуйте ещё раз или выберите меньше вопросов.'
+                ? 'Превышено время ожидания. Попробуйте ещё раз или выберите меньше вопросов.'
                 : (err.message || 'Ошибка генерации. Попробуйте ещё раз.');
             setError(msg);
         } finally {
@@ -102,6 +125,12 @@ function AIQuizSection() {
     };
 
     const finishTest = () => {
+        // Stop audio
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+        }
+
         let correct = 0;
         let wrong = 0;
 
@@ -131,13 +160,22 @@ function AIQuizSection() {
         setTestCompleted(true);
     };
 
-    const playAudio = () => {
-        if (audioRef.current) {
-            audioRef.current.play();
+    const toggleAudio = () => {
+        const audio = audioRef.current;
+        if (!audio) return;
+        if (audio.paused) {
+            audio.play().catch(() => {});
+        } else {
+            audio.pause();
+            audio.currentTime = 0;
         }
     };
 
     const resetQuiz = () => {
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+        }
         setTestStarted(false);
         setQuestions([]);
         setCurrentQuestionIndex(0);
@@ -145,7 +183,26 @@ function AIQuizSection() {
         setShowExplanation(false);
         setTestCompleted(false);
         setResults(null);
+        setIsPlaying(false);
     };
+
+    // Auth gate — require login
+    if (!user) {
+        return (
+            <div className="ai-quiz-section">
+                <Title level={2}>
+                    <RobotOutlined /> Квиз
+                </Title>
+                <Card style={{ maxWidth: 600, textAlign: 'center' }}>
+                    <LockOutlined style={{ fontSize: 48, color: '#8c8c8c', marginBottom: 16 }} />
+                    <Title level={4}>Требуется авторизация</Title>
+                    <Paragraph type="secondary">
+                        Для прохождения квиза необходимо войти в аккаунт или зарегистрироваться.
+                    </Paragraph>
+                </Card>
+            </div>
+        );
+    }
 
     // Start screen
     if (!testStarted) {
@@ -201,9 +258,9 @@ function AIQuizSection() {
                                         onChange={setDifficulty}
                                         style={{ width: '100%', marginTop: 8 }}
                                         options={[
-                                            { value: 'easy', label: 'Базовый (1-2 курс)' },
-                                            { value: 'medium', label: 'Средний (3-5 курс)' },
-                                            { value: 'hard', label: 'Продвинутый (ординатура)' },
+                                            { value: 'easy', label: 'Базовый' },
+                                            { value: 'medium', label: 'Средний' },
+                                            { value: 'hard', label: 'Продвинутый' },
                                         ]}
                                     />
                                 </div>
@@ -348,15 +405,25 @@ function AIQuizSection() {
                     <div className="question-header">
                         <Title level={4}>{currentQuestion?.question}</Title>
 
-                        {/* Audio player with controls */}
+                        {/* Audio player with play/stop */}
                         {currentQuestion?.audio_url && (
                             <div className="audio-player-container">
                                 <audio
                                     ref={audioRef}
                                     src={currentQuestion.audio_url}
-                                    controls
-                                    style={{ width: '100%', marginTop: 12 }}
+                                    preload="auto"
+                                    onPlay={() => setIsPlaying(true)}
+                                    onPause={() => setIsPlaying(false)}
+                                    onEnded={() => setIsPlaying(false)}
                                 />
+                                <Button
+                                    type="primary"
+                                    icon={isPlaying ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
+                                    onClick={toggleAudio}
+                                    style={{ marginTop: 8 }}
+                                >
+                                    {isPlaying ? 'Остановить' : 'Прослушать звук'}
+                                </Button>
                             </div>
                         )}
 
@@ -405,32 +472,28 @@ function AIQuizSection() {
                         </Space>
                     </Radio.Group>
 
-                    {
-                        showExplanation && (
-                            <Alert
-                                message={isCorrect ? 'Правильно!' : 'Неправильно'}
-                                description={currentQuestion?.explanation}
-                                type={isCorrect ? 'success' : 'error'}
-                                showIcon
-                            />
-                        )
-                    }
+                    {showExplanation && (
+                        <Alert
+                            message={isCorrect ? 'Правильно!' : 'Неправильно'}
+                            description={currentQuestion?.explanation}
+                            type={isCorrect ? 'success' : 'error'}
+                            showIcon
+                        />
+                    )}
 
-                    {
-                        showExplanation && (
-                            <Button
-                                type="primary"
-                                size="large"
-                                onClick={handleNext}
-                                block
-                            >
-                                {currentQuestionIndex < questions.length - 1 ? 'Следующий вопрос' : 'Завершить тест'}
-                            </Button>
-                        )
-                    }
-                </Space >
-            </Card >
-        </div >
+                    {showExplanation && (
+                        <Button
+                            type="primary"
+                            size="large"
+                            onClick={handleNext}
+                            block
+                        >
+                            {currentQuestionIndex < questions.length - 1 ? 'Следующий вопрос' : 'Завершить тест'}
+                        </Button>
+                    )}
+                </Space>
+            </Card>
+        </div>
     );
 }
 
