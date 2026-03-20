@@ -53,12 +53,23 @@ function AuthModal({ open, onClose, onAuthSuccess }) {
             year_of_study: vals.year_of_study,
             institution: vals.institution || 'ФГБОУ ВО РязГМУ Минздрава России',
         };
-        const { error } = await signUp(vals.email, vals.password, metadata);
+        const { data, error } = await signUp(vals.email, vals.password, metadata);
         setLoading(false);
         if (error) {
             message.error(error.message);
+        } else if (data?.user?.identities?.length === 0) {
+            // User already exists
+            message.error('Пользователь с таким email уже зарегистрирован. Попробуйте войти.');
+            setTab('login');
+        } else if (data?.session) {
+            // Auto-login successful (email confirmation disabled)
+            message.success('Регистрация прошла успешно!');
+            regForm.resetFields();
+            if (onAuthSuccess) onAuthSuccess();
+            onClose();
         } else {
-            message.success('Регистрация прошла успешно! Проверьте почту для подтверждения.');
+            // Email confirmation required — fallback message
+            message.success('Регистрация прошла! Проверьте почту для подтверждения, затем войдите.');
             regForm.resetFields();
             setTab('login');
         }
