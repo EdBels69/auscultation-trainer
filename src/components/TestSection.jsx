@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Card, Button, Radio, Typography, Progress, Space, Alert, Statistic, Row, Col, Select, message as antMessage } from 'antd';
+import { Card, Button, Radio, Typography, Progress, Space, Alert, Statistic, Row, Col, message as antMessage } from 'antd';
 import {
     PlayCircleOutlined,
     PauseCircleOutlined,
@@ -15,13 +15,6 @@ import { checkTestAchievements, notifyAchievements } from '../services/achieveme
 
 const { Title, Text, Paragraph } = Typography;
 
-const SESSION_TYPES = [
-    { value: 'practice', label: 'Практика (без записи)' },
-    { value: 'T1', label: 'T1 — Исходный уровень' },
-    { value: 'T2', label: 'T2 — После обучения' },
-    { value: 'T3', label: 'T3 — Отсроченный контроль' },
-];
-
 function TestSection({ audioRecords, user }) {
     const [testStarted, setTestStarted] = useState(false);
     const [questions, setQuestions] = useState([]);
@@ -30,7 +23,6 @@ function TestSection({ audioRecords, user }) {
     const [showExplanation, setShowExplanation] = useState(false);
     const [testCompleted, setTestCompleted] = useState(false);
     const [results, setResults] = useState(null);
-    const [sessionType, setSessionType] = useState('practice');
     const [startTime, setStartTime] = useState(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const audioRef = useRef(null);
@@ -133,7 +125,7 @@ function TestSection({ audioRecords, user }) {
 
             const { error } = await supabase.from('test_sessions').insert({
                 user_id: user.id,
-                session_type: sessionType,
+                session_type: 'practice',
                 score: testResults.score,
                 total_q: testResults.total,
                 correct_q: testResults.correct,
@@ -209,18 +201,6 @@ function TestSection({ audioRecords, user }) {
                                 • Минимальный балл для прохождения: 70%<br />
                                 • Вы можете прослушать каждый звук несколько раз
                             </Paragraph>
-                        </div>
-                        <div>
-                            <Text strong style={{ display: 'block', marginBottom: 8 }}>Тип сессии (НИР):</Text>
-                            <Select
-                                value={sessionType}
-                                onChange={setSessionType}
-                                style={{ width: '100%' }}
-                                options={SESSION_TYPES}
-                            />
-                            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
-                                T1/T2/T3 — результат записывается в базу для НИР. Практика не сохраняется.
-                            </Text>
                         </div>
                         <Button
                             type="primary"
