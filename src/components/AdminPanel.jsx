@@ -11,7 +11,7 @@ import { BugOutlined, RocketOutlined, BarChartOutlined, ImportOutlined } from '@
 
 const { Title } = Typography;
 
-function AdminPanel({ audioRecords, onAudioRecordsUpdate }) {
+function AdminPanel({ audioRecords, onAudioRecordsUpdate, participant }) {
     const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(true);
     const [batchImportOpen, setBatchImportOpen] = useState(false);
@@ -23,6 +23,9 @@ function AdminPanel({ audioRecords, onAudioRecordsUpdate }) {
         setIsTestMode(checked);
         localStorage.setItem('webhookTestMode', checked.toString());
     };
+
+    // Admin access: either via Supabase Auth session OR via participant with role='admin'
+    const isAdminParticipant = participant?.role === 'admin';
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -56,7 +59,7 @@ function AdminPanel({ audioRecords, onAudioRecordsUpdate }) {
         return <div style={{ padding: 50, textAlign: 'center' }}><Spin size="large" /></div>;
     }
 
-    if (!session) {
+    if (!session && !isAdminParticipant) {
         return <AdminLogin />;
     }
 

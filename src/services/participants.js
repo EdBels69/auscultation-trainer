@@ -1,24 +1,18 @@
 import { supabase } from './supabase';
 
-/** Shared participant password — all 1000 IDs use the same one */
-const PARTICIPANT_PASSWORD = 'auscult2026';
-
 /**
- * Validate participant credentials.
- * @param {string} code — e.g. "AT-0001"
+ * Validate participant credentials against the database.
+ * Password is stored per-row in the `participants` table.
+ * @param {string} code — e.g. "AT-0001" or "ADMIN"
  * @param {string} password
  * @returns {{ participant: object|null, error: string|null }}
  */
 export async function loginParticipant(code, password) {
-  if (password !== PARTICIPANT_PASSWORD) {
-    return { participant: null, error: 'Неверный пароль' };
-  }
-
   const normalized = code.trim().toUpperCase();
 
-  // Validate format
-  if (!/^AT-\d{4}$/.test(normalized)) {
-    return { participant: null, error: 'Неверный формат ID. Ожидается AT-0001 … AT-1000' };
+  // Validate format: AT-XXXX or ADMIN
+  if (!/^(AT-\d{4}|ADMIN)$/.test(normalized)) {
+    return { participant: null, error: 'Неверный формат ID' };
   }
 
   const { data, error } = await supabase
@@ -29,6 +23,11 @@ export async function loginParticipant(code, password) {
 
   if (error || !data) {
     return { participant: null, error: 'ID участника не найден' };
+  }
+
+  // Check password from DB
+  if (data.password && data.password !== password) {
+    return { participant: null, error: 'Неверный пароль' };
   }
 
   return { participant: data, error: null };

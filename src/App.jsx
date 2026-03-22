@@ -165,6 +165,7 @@ function App() {
             <AdminPanel
               audioRecords={audioRecords}
               onAudioRecordsUpdate={handleRecordsUpdate}
+              participant={participant}
             />
           </Suspense>
         );
