@@ -1,64 +1,37 @@
 import { supabase } from './supabase';
 
-/**
- * Generate a random participant code like "AT-7K3M"
- * Uses only uppercase letters + digits, excluding confusable chars (0/O, 1/I/L)
- */
-function generateCode() {
-  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 4; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return `AT-${code}`;
-}
+/** Shared participant password — all 1000 IDs use the same one */
+const PARTICIPANT_PASSWORD = 'auscult2026';
 
 /**
- * Create a new anonymous participant.
- * Returns { participant, error }
+ * Validate participant credentials.
+ * @param {string} code — e.g. "AT-0001"
+ * @param {string} password
+ * @returns {{ participant: object|null, error: string|null }}
  */
-export async function createParticipant({ full_name, role, year_of_study, institution }) {
-  // Try up to 5 times in case of code collision
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const code = generateCode();
-    const { data, error } = await supabase
-      .from('participants')
-      .insert({
-        code,
-        full_name,
-        role: role || 'student',
-        year_of_study: year_of_study || null,
-        institution: institution || 'ФГБОУ ВО РязГМУ Минздрава России',
-      })
-      .select()
-      .single();
-
-    if (!error) {
-      return { participant: data, error: null };
-    }
-
-    // If unique constraint violation on code, retry
-    if (error.code === '23505') continue;
-
-    return { participant: null, error };
+export async function loginParticipant(code, password) {
+  if (password !== PARTICIPANT_PASSWORD) {
+    return { participant: null, error: 'Неверный пароль' };
   }
 
-  return { participant: null, error: { message: 'Не удалось сгенерировать уникальный код' } };
-}
-
-/**
- * Find participant by code.
- * Returns { participant, error }
- */
-export async function findParticipantByCode(code) {
   const normalized = code.trim().toUpperCase();
+
+  // Validate format
+  if (!/^AT-\d{4}$/.test(normalized)) {
+    return { participant: null, error: 'Неверный формат ID. Ожидается AT-0001 … AT-1000' };
+  }
+
   const { data, error } = await supabase
     .from('participants')
     .select('*')
     .eq('code', normalized)
     .single();
 
-  return { participant: data, error };
+  if (error || !data) {
+    return { participant: null, error: 'ID участника не найден' };
+  }
+
+  return { participant: data, error: null };
 }
 
 /**
