@@ -9,7 +9,10 @@
  *   ten_sessions    — 10 test sessions completed
  *   sus_done        — SUS questionnaire submitted
  *   all_surveys     — all 5 survey types submitted
- *   theory_reader   — visited theory section (stored in localStorage, then awarded once)
+ *   theory_reader   — visited theory section
+ *
+ * Supports both auth users (user_id) and anonymous participants (participant_id).
+ * The `idField` parameter controls which column to use ('user_id' or 'participant_id').
  */
 import { supabase } from './supabase';
 
@@ -17,21 +20,27 @@ const ALL_SURVEY_TYPES = ['demographics', 'sus', 'confidence_pre', 'confidence_p
 
 /**
  * Award a badge if not already earned. Returns true if newly awarded.
+ * @param {string} identityId - UUID of user or participant
+ * @param {string} badgeKey
+ * @param {string} idField - 'user_id' or 'participant_id'
  */
-async function awardBadge(userId, badgeKey) {
+async function awardBadge(identityId, badgeKey, idField = 'participant_id') {
     // Check if already earned
     const { data: existing } = await supabase
         .from('achievements')
         .select('id')
-        .eq('user_id', userId)
+        .eq(idField, identityId)
         .eq('badge_key', badgeKey)
         .maybeSingle();
 
     if (existing) return false;
 
+    const payload = { badge_key: badgeKey };
+    payload[idField] = identityId;
+
     const { error } = await supabase
         .from('achievements')
-        .insert({ user_id: userId, badge_key: badgeKey });
+        .insert(payload);
 
     if (error) {
         console.error(`Failed to award badge ${badgeKey}:`, error);
@@ -42,38 +51,38 @@ async function awardBadge(userId, badgeKey) {
 
 /**
  * Check and award achievements after a test session is saved.
- * Call this after inserting a row into test_sessions.
- * @param {string} userId
+ * @param {string} identityId - UUID of user or participant
  * @param {number} score — percentage 0–100
+ * @param {string} idField - 'user_id' or 'participant_id'
  */
-export async function checkTestAchievements(userId, score) {
+export async function checkTestAchievements(identityId, score, idField = 'participant_id') {
     const awarded = [];
 
-    // first_session
     const { count } = await supabase
         .from('test_sessions')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId);
+        .eq(idField, identityId);
 
-    if (count >= 1 && await awardBadge(userId, 'first_session')) awarded.push('first_session');
-    if (count >= 5 && await awardBadge(userId, 'five_sessions')) awarded.push('five_sessions');
-    if (count >= 10 && await awardBadge(userId, 'ten_sessions')) awarded.push('ten_sessions');
+    if (count >= 1 && await awardBadge(identityId, 'first_session', idField)) awarded.push('first_session');
+    if (count >= 5 && await awardBadge(identityId, 'five_sessions', idField)) awarded.push('five_sessions');
+    if (count >= 10 && await awardBadge(identityId, 'ten_sessions', idField)) awarded.push('ten_sessions');
 
-    if (score >= 80 && await awardBadge(userId, 'score_80')) awarded.push('score_80');
-    if (score >= 100 && await awardBadge(userId, 'score_100')) awarded.push('score_100');
+    if (score >= 80 && await awardBadge(identityId, 'score_80', idField)) awarded.push('score_80');
+    if (score >= 100 && await awardBadge(identityId, 'score_100', idField)) awarded.push('score_100');
 
     return awarded;
 }
 
 /**
  * Check and award achievements after a survey is submitted.
- * @param {string} userId
+ * @param {string} identityId - UUID of user or participant
  * @param {string} surveyType — one of ALL_SURVEY_TYPES
+ * @param {string} idField - 'user_id' or 'participant_id'
  */
-export async function checkSurveyAchievements(userId, surveyType) {
+export async function checkSurveyAchievements(identityId, surveyType, idField = 'participant_id') {
     const awarded = [];
 
-    if (surveyType === 'sus' && await awardBadge(userId, 'sus_done')) {
+    if (surveyType === 'sus' && await awardBadge(identityId, 'sus_done', idField)) {
         awarded.push('sus_done');
     }
 
@@ -81,11 +90,11 @@ export async function checkSurveyAchievements(userId, surveyType) {
     const { data: done } = await supabase
         .from('survey_responses')
         .select('survey_type')
-        .eq('user_id', userId);
+        .eq(idField, identityId);
 
     const doneTypes = new Set((done || []).map(r => r.survey_type));
     const allDone = ALL_SURVEY_TYPES.every(t => doneTypes.has(t));
-    if (allDone && await awardBadge(userId, 'all_surveys')) {
+    if (allDone && await awardBadge(identityId, 'all_surveys', idField)) {
         awarded.push('all_surveys');
     }
 
@@ -93,18 +102,19 @@ export async function checkSurveyAchievements(userId, surveyType) {
 }
 
 /**
- * Award theory_reader badge (call once when user first visits theory section).
+ * Award theory_reader badge.
+ * @param {string} identityId
+ * @param {string} idField - 'user_id' or 'participant_id'
  */
-export async function checkTheoryAchievement(userId) {
-    if (!userId) return [];
+export async function checkTheoryAchievement(identityId, idField = 'participant_id') {
+    if (!identityId) return [];
     const awarded = [];
-    if (await awardBadge(userId, 'theory_reader')) awarded.push('theory_reader');
+    if (await awardBadge(identityId, 'theory_reader', idField)) awarded.push('theory_reader');
     return awarded;
 }
 
 /**
  * Show a toast notification for newly awarded badges.
- * Pass the antd message API and an array of badge keys.
  */
 export function notifyAchievements(messageApi, awardedKeys) {
     const BADGE_META = {

@@ -15,7 +15,7 @@ import { checkTestAchievements, notifyAchievements } from '../services/achieveme
 
 const { Title, Text, Paragraph } = Typography;
 
-function TestSection({ audioRecords, user }) {
+function TestSection({ audioRecords, user, participant }) {
     const [testStarted, setTestStarted] = useState(false);
     const [questions, setQuestions] = useState([]);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -112,8 +112,9 @@ function TestSection({ audioRecords, user }) {
         setResults(testResults);
         setTestCompleted(true);
 
-        // Save to Supabase if logged in
-        if (user) {
+        // Save to Supabase if participant or user is available
+        const canSave = !!(participant || user);
+        if (canSave) {
             const durationSec = startTime ? Math.round((Date.now() - startTime) / 1000) : null;
             const answersPayload = questions.map((q, i) => ({
                 question: q.question,
@@ -124,8 +125,9 @@ function TestSection({ audioRecords, user }) {
             }));
 
             const { error } = await supabase.from('test_sessions').insert({
-                user_id: user.id,
-                session_type: 'practice',
+                user_id: user?.id || null,
+                participant_id: participant?.id || null,
+                session_type: 'test',
                 score: testResults.score,
                 total_q: testResults.total,
                 correct_q: testResults.correct,
@@ -134,7 +136,9 @@ function TestSection({ audioRecords, user }) {
             });
 
             if (!error) {
-                const awarded = await checkTestAchievements(user.id, testResults.score);
+                const identityId = participant?.id || user?.id;
+                const idField = participant ? 'participant_id' : 'user_id';
+                const awarded = await checkTestAchievements(identityId, testResults.score, idField);
                 if (awarded.length > 0) notifyAchievements(antMessage, awarded);
             } else {
                 console.error('Error saving test session:', error);
@@ -153,17 +157,17 @@ function TestSection({ audioRecords, user }) {
         }
     }, []);
 
-    // Auth gate — require login
-    if (!user) {
+    // Require participant or user to take test
+    if (!participant && !user) {
         return (
             <div style={{ padding: '32px 0' }}>
                 <Title level={2}>Тестирование знаний</Title>
                 <Card style={{ maxWidth: 600, marginTop: 24, textAlign: 'center' }}>
                     <LockOutlined style={{ fontSize: 48, color: '#8c8c8c', marginBottom: 16 }} />
-                    <Title level={4}>Требуется авторизация</Title>
+                    <Title level={4}>Необходимо войти</Title>
                     <Paragraph type="secondary">
-                        Для прохождения теста необходимо войти в аккаунт или зарегистрироваться.
-                        Результаты тестирования сохраняются в вашем профиле.
+                        Для прохождения теста нажмите «Войти» и введите свои данные.
+                        Результаты тестирования привязываются к вашему коду участника.
                     </Paragraph>
                 </Card>
             </div>

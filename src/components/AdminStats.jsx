@@ -105,9 +105,10 @@ const CONF_KEYS = ['c1','c2','c3','c4','c5'];
 
 function buildSurveySheets(surveys) {
     const fmt = (s) => new Date(s.created_at).toLocaleString('ru');
+    const idCol = (s) => s.participant_id || s.user_id || '—';
     const susRows = surveys.filter(s => s.survey_type === 'sus').map(s => {
         const r = s.responses || {};
-        const row = { 'User ID': s.user_id || '—', 'Дата': fmt(s), 'SUS балл': s.score ?? '—' };
+        const row = { 'ID участника': idCol(s), 'Дата': fmt(s), 'SUS балл': s.score ?? '—' };
         SUS_KEYS.forEach((k, i) => { row[`Вопрос ${i+1}`] = r[k] ?? '—'; });
         return row;
     });
@@ -115,7 +116,7 @@ function buildSurveySheets(surveys) {
         const r = s.responses || {};
         const vals = CONF_KEYS.map(k => Number(r[k]) || 0).filter(v => v > 0);
         const avg = vals.length ? round(mean(vals)) : '—';
-        const row = { 'User ID': s.user_id || '—', 'Дата': fmt(s), 'Среднее (1-5)': avg };
+        const row = { 'ID участника': idCol(s), 'Дата': fmt(s), 'Среднее (1-5)': avg };
         CONF_KEYS.forEach((k, i) => { row[`C${i+1}`] = r[k] ?? '—'; });
         return row;
     });
@@ -123,14 +124,14 @@ function buildSurveySheets(surveys) {
         const r = s.responses || {};
         const vals = CONF_KEYS.map(k => Number(r[k]) || 0).filter(v => v > 0);
         const avg = vals.length ? round(mean(vals)) : '—';
-        const row = { 'User ID': s.user_id || '—', 'Дата': fmt(s), 'Среднее (1-5)': avg };
+        const row = { 'ID участника': idCol(s), 'Дата': fmt(s), 'Среднее (1-5)': avg };
         CONF_KEYS.forEach((k, i) => { row[`C${i+1}`] = r[k] ?? '—'; });
         return row;
     });
     const demoRows = surveys.filter(s => s.survey_type === 'demographics').map(s => {
         const r = s.responses || {};
         return {
-            'User ID': s.user_id || '—', 'Дата': fmt(s),
+            'ID участника': idCol(s), 'Дата': fmt(s),
             'Возраст': r.age ?? '—', 'Слух': r.hearing ?? '—',
             'Опыт аускультации': r.auscultation_exp ?? '—',
             'Цифровые тренажёры ранее': r.prior_digital ?? '—',
@@ -140,7 +141,7 @@ function buildSurveySheets(surveys) {
     const feedbackRows = surveys.filter(s => s.survey_type === 'feedback').map(s => {
         const r = s.responses || {};
         return {
-            'User ID': s.user_id || '—', 'Дата': fmt(s),
+            'ID участника': idCol(s), 'Дата': fmt(s),
             'Что понравилось': r.likes ?? '—', 'Что не понравилось': r.dislikes ?? '—',
             'Предложения': r.suggestions ?? '—', 'Оценка ИИ': r.ai_quality ?? '—',
         };
@@ -279,14 +280,14 @@ function AdminStats() {
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const [sessRes, survRes, profRes] = await Promise.all([
+            const [sessRes, survRes, partRes] = await Promise.all([
                 supabase.from('test_sessions').select('*').order('created_at', { ascending: false }),
                 supabase.from('survey_responses').select('*').order('created_at', { ascending: false }),
-                supabase.from('profiles').select('*'),
+                supabase.from('participants').select('*'),
             ]);
             setSessions(sessRes.data || []);
             setSurveys(survRes.data || []);
-            setProfiles(profRes.data || []);
+            setProfiles(partRes.data || []);
         } catch (e) {
             message.error('Ошибка загрузки: ' + e.message);
         }
@@ -327,23 +328,27 @@ function AdminStats() {
         ? `${periodsWithData[0].name.split('—')[0].trim()} → ${periodsWithData[1].name.split('—')[0].trim()}`
         : 'Дельта';
 
+    /** Get the identity ID from a session (participant_id preferred, then user_id) */
+    const getSessionIdentity = (s) => s.participant_id || s.user_id;
+
     // Paired users between first two periods
     const pairedUsers = [];
     const userDeltas = [];
     if (periodsWithData.length >= 2) {
         const p1Sess = periodsWithData[0].sessions;
         const p2Sess = periodsWithData[1].sessions;
-        const usersP1 = new Set(p1Sess.map(s => s.user_id).filter(Boolean));
-        const usersP2 = new Set(p2Sess.map(s => s.user_id).filter(Boolean));
+        const usersP1 = new Set(p1Sess.map(getSessionIdentity).filter(Boolean));
+        const usersP2 = new Set(p2Sess.map(getSessionIdentity).filter(Boolean));
         const paired = [...usersP1].filter(u => usersP2.has(u));
         pairedUsers.push(...paired);
 
         paired.forEach(uid => {
-            const u1 = p1Sess.filter(s => s.user_id === uid);
-            const u2 = p2Sess.filter(s => s.user_id === uid);
+            const u1 = p1Sess.filter(s => getSessionIdentity(s) === uid);
+            const u2 = p2Sess.filter(s => getSessionIdentity(s) === uid);
             const profile = profiles.find(p => p.id === uid);
             userDeltas.push({
                 user_id: uid,
+                code: profile?.code,
                 role: profile?.role,
                 p1_name: periodsWithData[0].name.split('—')[0].trim(),
                 p2_name: periodsWithData[1].name.split('—')[0].trim(),
@@ -395,20 +400,21 @@ function AdminStats() {
 
     /* ── Student progress table ──────────────────────────────── */
     const studentProgress = profiles.map(profile => {
-        const userSessions = filtered.filter(s => s.user_id === profile.id);
+        const userSessions = filtered.filter(s => s.participant_id === profile.id || s.user_id === profile.id);
         const scores = userSessions.map(s => s.score).filter(v => v != null);
         const lastSession = userSessions[0]; // already sorted by created_at desc
 
         // Per-period scores
         const perPeriod = {};
         periods.forEach(p => {
-            const pSess = (sessionsByPeriod[p.id] || []).filter(s => s.user_id === profile.id);
+            const pSess = (sessionsByPeriod[p.id] || []).filter(s => s.participant_id === profile.id || s.user_id === profile.id);
             const pScores = pSess.map(s => s.score).filter(v => v != null);
             perPeriod[p.id] = pScores.length ? round(mean(pScores)) : null;
         });
 
         return {
             user_id: profile.id,
+            code: profile.code || null,
             full_name: profile.full_name || '—',
             role: profile.role,
             total_sessions: userSessions.length,
@@ -441,7 +447,8 @@ function AdminStats() {
             {
                 name: 'Дельта по участникам',
                 data: userDeltas.map(u => ({
-                    'ID пользователя': u.user_id,
+                    'ID участника': u.user_id,
+                    'Код': u.code || '—',
                     'Роль': u.role || '—',
                     [`${p1Name} (%)`]: u.p1_score,
                     [`${p2Name} (%)`]: u.p2_score,
@@ -454,7 +461,7 @@ function AdminStats() {
                     const period = assignPeriod(s.created_at, periods);
                     return {
                         'ID': s.id,
-                        'User ID': s.user_id || '—',
+                        'ID участника': s.participant_id || s.user_id || '—',
                         'Период': period?.name || '(вне периодов)',
                         'Балл (%)': s.score,
                         'Правильных': s.correct_q,
@@ -468,6 +475,7 @@ function AdminStats() {
                 name: 'Прогресс студентов',
                 data: studentProgress.map(s => {
                     const row = {
+                        'Код': s.code || '—',
                         'ФИО': s.full_name,
                         'Роль': s.role || '—',
                         'Всего сессий': s.total_sessions,
@@ -488,7 +496,7 @@ function AdminStats() {
             {
                 name: 'Участники',
                 data: profiles.map(p => ({
-                    'ID': p.id, 'ФИО': p.full_name || '—', 'Роль': p.role || '—',
+                    'ID': p.id, 'Код': p.code || '—', 'ФИО': p.full_name || '—', 'Роль': p.role || '—',
                     'Курс': p.year_of_study || '—', 'Учреждение': p.institution || '—',
                     'Дата регистрации': new Date(p.created_at).toLocaleString('ru'),
                 })),
@@ -527,6 +535,7 @@ function AdminStats() {
 
     // Student progress columns
     const progressColumns = [
+        { title: 'Код', dataIndex: 'code', width: 90, render: (v) => v ? <Tag style={{ fontFamily: 'monospace' }}>{v}</Tag> : '—' },
         { title: 'ФИО', dataIndex: 'full_name', ellipsis: true, width: 180 },
         { title: 'Роль', dataIndex: 'role', render: roleBadge, width: 120 },
         { title: 'Сессий', dataIndex: 'total_sessions', sorter: (a, b) => a.total_sessions - b.total_sessions, width: 80 },

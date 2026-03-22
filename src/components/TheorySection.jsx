@@ -16,7 +16,7 @@ import { checkTheoryAchievement, notifyAchievements } from '../services/achievem
 const { Sider, Content } = Layout;
 const { Title, Paragraph } = Typography;
 
-function TheorySection({ user }) {
+function TheorySection({ user, participant }) {
     const [nodes, setNodes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedNode, setSelectedNode] = useState(null);
@@ -24,15 +24,18 @@ function TheorySection({ user }) {
     const [expandedKeys, setExpandedKeys] = useState([]);
     const [selectedKeys, setSelectedKeys] = useState([]);
 
+    const identityId = participant?.id || user?.id;
+    const idField = participant ? 'participant_id' : 'user_id';
+
     useEffect(() => {
         loadNodes();
         // Award theory_reader badge on first visit
-        if (user?.id) {
-            checkTheoryAchievement(user.id).then(awarded => {
+        if (identityId) {
+            checkTheoryAchievement(identityId, idField).then(awarded => {
                 if (awarded.length > 0) notifyAchievements(message, awarded);
             });
         }
-    }, [user?.id]);
+    }, [identityId]);
 
     const loadNodes = async () => {
         try {

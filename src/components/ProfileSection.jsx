@@ -1,20 +1,19 @@
 /**
- * ProfileSection — user profile view & edit
+ * ProfileSection — user profile view (read-only)
  * Shows: personal info, role, training statistics summary, badge/achievements preview
  */
 import { useState, useEffect, useCallback } from 'react';
 import {
-    Card, Form, Input, Select, Button, Avatar, Typography, message,
+    Card, Avatar, Typography,
     Divider, Row, Col, Statistic, Tag, Spin, Space, Alert, Progress,
 } from 'antd';
 import {
-    UserOutlined, EditOutlined, SaveOutlined, TrophyOutlined,
-    CheckCircleOutlined, BookOutlined, BarChartOutlined, CloseOutlined,
+    UserOutlined, TrophyOutlined,
+    CheckCircleOutlined, BookOutlined, BarChartOutlined,
 } from '@ant-design/icons';
 import { supabase } from '../services/supabase';
 
 const { Title, Text, Paragraph } = Typography;
-const { Option } = Select;
 
 const ROLE_OPTIONS = [
     { value: 'student', label: 'Студент' },
@@ -41,36 +40,23 @@ const BADGE_META = {
     theory_reader: { label: 'Изучил теорию', icon: '📚', color: '#1890ff' },
 };
 
-function ProfileSection({ user }) {
-    const [profile, setProfile] = useState(null);
+function ProfileSection({ user, participant }) {
     const [stats, setStats] = useState(null);
     const [achievements, setAchievements] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [editing, setEditing] = useState(false);
-    const [saving, setSaving] = useState(false);
-    const [form] = Form.useForm();
+
+    const identityId = participant?.id || user?.id;
+    const idField = participant ? 'participant_id' : 'user_id';
 
     const loadProfile = useCallback(async () => {
-        if (!user) return;
+        if (!identityId) return;
         setLoading(true);
         try {
-            // Load profile
-            const { data: profileData, error: pErr } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', user.id)
-                .single();
-
-            if (pErr && pErr.code !== 'PGRST116') {
-                console.error('Profile load error:', pErr);
-            }
-            setProfile(profileData || {});
-
             // Load test session stats
             const { data: sessions } = await supabase
                 .from('test_sessions')
                 .select('score, total_q, correct_q, session_type, created_at')
-                .eq('user_id', user.id)
+                .eq(idField, identityId)
                 .order('created_at', { ascending: false });
 
             if (sessions && sessions.length > 0) {
@@ -90,7 +76,7 @@ function ProfileSection({ user }) {
             const { data: achData } = await supabase
                 .from('achievements')
                 .select('badge_key, earned_at')
-                .eq('user_id', user.id)
+                .eq(idField, identityId)
                 .order('earned_at', { ascending: true });
 
             setAchievements(achData || []);
@@ -99,71 +85,20 @@ function ProfileSection({ user }) {
         } finally {
             setLoading(false);
         }
-    }, [user]);
+    }, [identityId, idField]);
 
     useEffect(() => {
         loadProfile();
     }, [loadProfile]);
 
-    const startEdit = () => {
-        form.setFieldsValue({
-            full_name: profile?.full_name || user?.user_metadata?.full_name || '',
-            role: profile?.role || user?.user_metadata?.role || '',
-            year_of_study: profile?.year_of_study || '',
-            institution: profile?.institution || '',
-            specialty: profile?.specialty || '',
-        });
-        setEditing(true);
-    };
-
-    const cancelEdit = () => {
-        setEditing(false);
-        form.resetFields();
-    };
-
-    const handleSave = async (values) => {
-        setSaving(true);
-        try {
-            const { error } = await supabase
-                .from('profiles')
-                .upsert({
-                    id: user.id,
-                    full_name: values.full_name,
-                    role: values.role,
-                    year_of_study: values.year_of_study || null,
-                    institution: values.institution || null,
-                    specialty: values.specialty || null,
-                    updated_at: new Date().toISOString(),
-                }, { onConflict: 'id' });
-
-            if (error) throw error;
-
-            // Also update auth user metadata for consistency
-            await supabase.auth.updateUser({
-                data: {
-                    full_name: values.full_name,
-                    role: values.role,
-                },
-            });
-
-            message.success('Профиль сохранён');
-            setProfile(prev => ({ ...prev, ...values }));
-            setEditing(false);
-        } catch (err) {
-            message.error('Ошибка сохранения: ' + err.message);
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    if (!user) {
+    if (!participant && !user) {
         return (
             <div style={{ padding: '48px 0', textAlign: 'center' }}>
                 <Alert
                     type="info"
                     showIcon
-                    message="Необходима авторизация"
-                    description="Чтобы просматривать и редактировать профиль, войдите в систему."
+                    message="Необходимо войти"
+                    description="Нажмите «Войти» для просмотра профиля и статистики."
                     style={{ maxWidth: 460, margin: '0 auto' }}
                 />
             </div>
@@ -174,8 +109,8 @@ function ProfileSection({ user }) {
         return <div style={{ padding: 80, textAlign: 'center' }}><Spin size="large" /></div>;
     }
 
-    const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Пользователь';
-    const role = profile?.role || user?.user_metadata?.role;
+    const displayName = participant?.full_name || user?.user_metadata?.full_name || 'Участник';
+    const role = participant?.role || user?.user_metadata?.role;
     const roleLabel = ROLE_OPTIONS.find(r => r.value === role)?.label;
 
     return (
@@ -192,83 +127,21 @@ function ProfileSection({ user }) {
                         <Title level={3} style={{ margin: 0 }}>{displayName}</Title>
                         <Space size={8} style={{ marginTop: 6 }}>
                             {roleLabel && <Tag color={ROLE_COLORS[role] || 'default'}>{roleLabel}</Tag>}
-                            {profile?.institution && <Text type="secondary">{profile.institution}</Text>}
                         </Space>
-                        {profile?.specialty && (
+                        {participant?.code && (
                             <div style={{ marginTop: 4 }}>
-                                <Text type="secondary" style={{ fontSize: 13 }}>{profile.specialty}</Text>
+                                <Text type="secondary" style={{ fontSize: 12, fontFamily: 'monospace' }}>
+                                    Код: {participant.code}
+                                </Text>
                             </div>
                         )}
-                        <div style={{ marginTop: 4 }}>
-                            <Text type="secondary" style={{ fontSize: 12 }}>{user.email}</Text>
-                        </div>
+                        {!participant && user?.email && (
+                            <div style={{ marginTop: 4 }}>
+                                <Text type="secondary" style={{ fontSize: 12 }}>{user.email}</Text>
+                            </div>
+                        )}
                     </div>
-                    {!editing && (
-                        <Button icon={<EditOutlined />} onClick={startEdit}>
-                            Редактировать
-                        </Button>
-                    )}
                 </div>
-
-                {/* Edit form */}
-                {editing && (
-                    <>
-                        <Divider style={{ margin: '20px 0' }} />
-                        <Form form={form} layout="vertical" onFinish={handleSave}>
-                            <Row gutter={16}>
-                                <Col xs={24} sm={12}>
-                                    <Form.Item
-                                        name="full_name"
-                                        label="ФИО"
-                                        rules={[{ required: true, message: 'Введите ФИО' }]}
-                                    >
-                                        <Input prefix={<UserOutlined />} placeholder="Иванов Иван Иванович" />
-                                    </Form.Item>
-                                </Col>
-                                <Col xs={24} sm={12}>
-                                    <Form.Item name="role" label="Роль" rules={[{ required: true, message: 'Выберите роль' }]}>
-                                        <Select placeholder="Выберите роль">
-                                            {ROLE_OPTIONS.map(r => <Option key={r.value} value={r.value}>{r.label}</Option>)}
-                                        </Select>
-                                    </Form.Item>
-                                </Col>
-                                <Col xs={24} sm={12}>
-                                    <Form.Item name="institution" label="Учреждение">
-                                        <Input placeholder="Название университета / больницы" />
-                                    </Form.Item>
-                                </Col>
-                                <Col xs={24} sm={12}>
-                                    <Form.Item name="specialty" label="Специальность">
-                                        <Input placeholder="Терапия, кардиология…" />
-                                    </Form.Item>
-                                </Col>
-                                <Form.Item noStyle shouldUpdate={(prev, cur) => prev.role !== cur.role}>
-                                    {({ getFieldValue }) =>
-                                        getFieldValue('role') === 'student' ? (
-                                            <Col xs={24} sm={12}>
-                                                <Form.Item name="year_of_study" label="Курс">
-                                                    <Select placeholder="Выберите курс">
-                                                        {[1, 2, 3, 4, 5, 6].map(y => (
-                                                            <Option key={y} value={y}>{y} курс</Option>
-                                                        ))}
-                                                    </Select>
-                                                </Form.Item>
-                                            </Col>
-                                        ) : null
-                                    }
-                                </Form.Item>
-                            </Row>
-                            <Space>
-                                <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={saving}>
-                                    Сохранить
-                                </Button>
-                                <Button icon={<CloseOutlined />} onClick={cancelEdit}>
-                                    Отмена
-                                </Button>
-                            </Space>
-                        </Form>
-                    </>
-                )}
             </Card>
 
             {/* Stats row */}

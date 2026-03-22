@@ -95,7 +95,7 @@ function ChatBubble({ message, isLast }) {
     );
 }
 
-function AIChatSection({ user }) {
+function AIChatSection({ user, participant }) {
     const [messages, setMessages] = useState([INITIAL_MESSAGE]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
@@ -110,20 +110,23 @@ function AIChatSection({ user }) {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, loading]);
 
-    // Load last test mistakes if user is logged in
-    useEffect(() => {
-        if (user?.id) {
-            loadLastMistakes(user.id);
-        }
-    }, [user?.id]);
+    const identityId = participant?.id || user?.id;
+    const idField = participant ? 'participant_id' : 'user_id';
 
-    const loadLastMistakes = async (userId) => {
+    // Load last test mistakes if user/participant is logged in
+    useEffect(() => {
+        if (identityId) {
+            loadLastMistakes(identityId, idField);
+        }
+    }, [identityId]);
+
+    const loadLastMistakes = async (id, field) => {
         setLoadingMistakes(true);
         try {
             const { data } = await supabase
                 .from('test_sessions')
                 .select('score, correct_q, total_q, created_at, answers, session_type, category')
-                .eq('user_id', userId)
+                .eq(field, id)
                 .order('created_at', { ascending: false })
                 .limit(1)
                 .single();
@@ -218,7 +221,7 @@ function AIChatSection({ user }) {
             </div>
 
             {/* Mistakes panel */}
-            {user && lastMistakes && (
+            {(user || participant) && lastMistakes && (
                 <Alert
                     style={{ marginBottom: 12 }}
                     type="warning"
@@ -238,7 +241,7 @@ function AIChatSection({ user }) {
                     }
                 />
             )}
-            {user && !lastMistakes && !loadingMistakes && (
+            {(user || participant) && !lastMistakes && !loadingMistakes && (
                 <Alert
                     style={{ marginBottom: 12 }}
                     type="info"

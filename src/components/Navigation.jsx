@@ -17,7 +17,7 @@ const ROLE_LABELS = {
     teacher: 'Преподаватель',
 };
 
-function Navigation({ currentSection, onSectionChange, user, onAuthClick, onSignOut }) {
+function Navigation({ currentSection, onSectionChange, user, participant, onAuthClick, onSignOut }) {
     const [isMobile, setIsMobile] = useState(false);
     const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -43,8 +43,11 @@ function Navigation({ currentSection, onSectionChange, user, onAuthClick, onSign
         setDrawerOpen(false);
     };
 
-    const role = user?.user_metadata?.role;
-    const name = user?.user_metadata?.full_name || user?.email || '';
+    // Show participant info if available, otherwise fall back to auth user
+    const isLoggedIn = !!(participant || user);
+    const role = participant?.role || user?.user_metadata?.role;
+    const name = participant?.full_name || user?.user_metadata?.full_name || user?.email || '';
+    const participantCode = participant?.code;
 
     const userMenuItems = [
         {
@@ -115,16 +118,20 @@ function Navigation({ currentSection, onSectionChange, user, onAuthClick, onSign
 
                 {/* User area */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                    {user ? (
+                    {isLoggedIn ? (
                         <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                                 <Avatar size={28} icon={<UserOutlined />} style={{ background: '#635bff' }} />
                                 {!isMobile && (
                                     <div style={{ lineHeight: 1.3 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: '#0a2540' }}>
-                                            {name.split(' ')[0] || 'Пользователь'}
+                                        <div style={{ fontSize: 12, fontWeight: 600, color: '#0a2540' }}>
+                                            {name.split(' ')[0] || 'Участник'}
                                         </div>
-                                        {role && (
+                                        {participantCode ? (
+                                            <div style={{ fontSize: 10, color: '#635bff', fontFamily: 'monospace' }}>
+                                                {participantCode}
+                                            </div>
+                                        ) : role && (
                                             <div style={{ fontSize: 10, color: '#8898aa' }}>
                                                 {ROLE_LABELS[role] || role}
                                             </div>
@@ -167,10 +174,10 @@ function Navigation({ currentSection, onSectionChange, user, onAuthClick, onSign
                     onClick={handleSelect}
                     style={{ border: 'none', fontSize: 14 }}
                 />
-                {!user && (
+                {!isLoggedIn && (
                     <div style={{ padding: '16px' }}>
                         <Button block onClick={() => { onAuthClick(); setDrawerOpen(false); }}>
-                            Войти / Зарегистрироваться
+                            Войти
                         </Button>
                     </div>
                 )}

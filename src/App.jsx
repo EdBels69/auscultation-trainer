@@ -2,9 +2,10 @@ import { useState, useEffect, memo, useCallback, useMemo, lazy, Suspense } from 
 import { Layout, Spin, message } from 'antd';
 import Navigation from './components/Navigation';
 import ResetPasswordModal from './components/ResetPasswordModal';
-import AuthModal from './components/AuthModal';
+import ParticipantModal from './components/ParticipantModal';
 import { getSounds } from './services/api';
 import { supabase } from './services/supabase';
+import { getStoredParticipant, clearParticipant } from './services/participants';
 
 const { Content } = Layout;
 
@@ -27,6 +28,7 @@ function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [user, setUser] = useState(null);
+  const [participant, setParticipant] = useState(() => getStoredParticipant());
 
   // Detect mobile
   useEffect(() => {
@@ -124,37 +126,37 @@ function App() {
       case 'theory':
         return (
           <Suspense fallback={<LoadingFallback />}>
-            <TheorySection user={user} />
+            <TheorySection user={user} participant={participant} />
           </Suspense>
         );
       case 'test':
         return (
           <Suspense fallback={<LoadingFallback />}>
-            <TestSection audioRecords={audioRecords} user={user} />
+            <TestSection audioRecords={audioRecords} user={user} participant={participant} />
           </Suspense>
         );
       case 'aiquiz':
         return (
           <Suspense fallback={<LoadingFallback />}>
-            <AIQuizSection user={user} />
+            <AIQuizSection user={user} participant={participant} />
           </Suspense>
         );
       case 'chat':
         return (
           <Suspense fallback={<LoadingFallback />}>
-            <AIChatSection user={user} />
+            <AIChatSection user={user} participant={participant} />
           </Suspense>
         );
       case 'surveys':
         return (
           <Suspense fallback={<LoadingFallback />}>
-            <SurveySection user={user} />
+            <SurveySection user={user} participant={participant} />
           </Suspense>
         );
       case 'profile':
         return (
           <Suspense fallback={<LoadingFallback />}>
-            <ProfileSection user={user} />
+            <ProfileSection user={user} participant={participant} />
           </Suspense>
         );
       case 'admin':
@@ -173,7 +175,7 @@ function App() {
           </Suspense>
         );
     }
-  }, [currentSection, audioRecords, loading, handleRecordsUpdate]);
+  }, [currentSection, audioRecords, loading, handleRecordsUpdate, participant]);
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -182,8 +184,15 @@ function App() {
         currentSection={currentSection}
         onSectionChange={handleSectionChange}
         user={user}
+        participant={participant}
         onAuthClick={() => setShowAuthModal(true)}
-        onSignOut={() => supabase.auth.signOut()}
+        onSignOut={() => {
+          // Sign out admin (Supabase auth)
+          supabase.auth.signOut();
+          // Clear participant session
+          clearParticipant();
+          setParticipant(null);
+        }}
       />
 
       <Content style={{
@@ -202,11 +211,11 @@ function App() {
         onClose={() => setShowPasswordReset(false)}
       />
 
-      {/* Auth modal for regular users */}
-      <AuthModal
+      {/* Participant modal for anonymous entry */}
+      <ParticipantModal
         open={showAuthModal}
         onClose={() => setShowAuthModal(false)}
-        onAuthSuccess={() => setShowAuthModal(false)}
+        onParticipantReady={(p) => { setParticipant(p); setShowAuthModal(false); }}
       />
     </Layout>
   );

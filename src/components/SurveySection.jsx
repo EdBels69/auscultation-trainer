@@ -292,19 +292,22 @@ function FeedbackForm({ onSubmit, loading }) {
 /* ════════════════════════════════════════════════════════════════
    MAIN SurveySection
    ════════════════════════════════════════════════════════════════ */
-function SurveySection({ user }) {
+function SurveySection({ user, participant }) {
     const [loading, setLoading] = useState(false);
     const [completed, setCompleted] = useState({});
     const [scores, setScores] = useState({});
 
+    const identityId = participant?.id || user?.id;
+    const idField = participant ? 'participant_id' : 'user_id';
+
     // Load already-submitted surveys
     useEffect(() => {
-        if (!user) return;
+        if (!identityId) return;
         const load = async () => {
             const { data } = await supabase
                 .from('survey_responses')
                 .select('survey_type, score, created_at')
-                .eq('user_id', user.id)
+                .eq(idField, identityId)
                 .order('created_at', { ascending: false });
             if (data) {
                 const done = {};
@@ -320,12 +323,13 @@ function SurveySection({ user }) {
             }
         };
         load();
-    }, [user]);
+    }, [identityId]);
 
     const submitSurvey = async ({ survey_type, responses, score = null }) => {
         setLoading(true);
         const payload = {
             user_id: user?.id || null,
+            participant_id: participant?.id || null,
             survey_type,
             responses,
             score,
@@ -339,8 +343,8 @@ function SurveySection({ user }) {
             setCompleted(prev => ({ ...prev, [survey_type]: true }));
             if (score !== null) setScores(prev => ({ ...prev, [survey_type]: score }));
             // Check achievements
-            if (user?.id) {
-                const awarded = await checkSurveyAchievements(user.id, survey_type);
+            if (identityId) {
+                const awarded = await checkSurveyAchievements(identityId, survey_type, idField);
                 if (awarded.length > 0) notifyAchievements(message, awarded);
             }
         }
@@ -450,14 +454,14 @@ function SurveySection({ user }) {
         },
     ];
 
-    if (!user) {
+    if (!participant && !user) {
         return (
             <div style={{ maxWidth: 600, margin: '60px auto', padding: '0 16px' }}>
                 <Alert
                     type="info"
                     showIcon
-                    message="Требуется авторизация"
-                    description="Войдите или зарегистрируйтесь, чтобы заполнить анкеты и участвовать в НИР."
+                    message="Необходимо войти"
+                    description="Нажмите «Войти» и введите свои данные для заполнения анкет."
                 />
             </div>
         );
