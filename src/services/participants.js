@@ -10,8 +10,8 @@ import { supabase } from './supabase';
 export async function loginParticipant(code, password) {
   const normalized = code.trim().toUpperCase();
 
-  // Validate format: AT-XXXX or ADMIN-XX
-  if (!/^(AT-\d{4}|ADMIN(-\d{1,2})?)$/.test(normalized)) {
+  // Validate format: AT-XXXX or AT-ADM
+  if (!/^AT-(\d{4}|ADM)$/.test(normalized)) {
     return { participant: null, error: 'Неверный формат ID' };
   }
 

@@ -77,7 +77,7 @@ function ParticipantModal({ open, onClose, onParticipantReady }) {
                         placeholder="AT-0001"
                         size="large"
                         style={{ fontFamily: 'monospace', fontSize: 20, letterSpacing: 2, textAlign: 'center' }}
-                        maxLength={7}
+                        maxLength={10}
                         autoComplete="off"
                         onInput={(e) => { e.target.value = e.target.value.toUpperCase(); }}
                         autoFocus
