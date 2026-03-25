@@ -281,7 +281,7 @@ function AdminStats() {
         setLoading(true);
         try {
             const [sessRes, survRes, partRes] = await Promise.all([
-                supabase.from('test_sessions').select('*').order('created_at', { ascending: false }),
+                supabase.from('test_sessions').select('*').order('completed_at', { ascending: false }),
                 supabase.from('survey_responses').select('*').order('created_at', { ascending: false }),
                 supabase.from('participants').select('*'),
             ]);
@@ -299,7 +299,7 @@ function AdminStats() {
     /* ── filters & derived data ──────────────────────────────── */
     const filtered = dateRange
         ? sessions.filter(s => {
-            const d = new Date(s.created_at);
+            const d = new Date(s.completed_at);
             return d >= dateRange[0].toDate() && d <= dateRange[1].toDate();
         })
         : sessions;
@@ -308,7 +308,7 @@ function AdminStats() {
     const sessionsByPeriod = {};
     periods.forEach(p => { sessionsByPeriod[p.id] = []; });
     filtered.forEach(s => {
-        const period = assignPeriod(s.created_at || s.completed_at, periods);
+        const period = assignPeriod(s.completed_at, periods);
         if (period) sessionsByPeriod[period.id].push(s);
     });
 
@@ -402,7 +402,7 @@ function AdminStats() {
     const studentProgress = profiles.map(profile => {
         const userSessions = filtered.filter(s => s.participant_id === profile.id || s.user_id === profile.id);
         const scores = userSessions.map(s => s.score).filter(v => v != null);
-        const lastSession = userSessions[0]; // already sorted by created_at desc
+        const lastSession = userSessions[0]; // already sorted by completed_at desc
 
         // Per-period scores
         const perPeriod = {};
@@ -420,7 +420,7 @@ function AdminStats() {
             total_sessions: userSessions.length,
             avg_score: scores.length ? round(mean(scores)) : null,
             best_score: scores.length ? Math.max(...scores) : null,
-            last_date: lastSession?.created_at || null,
+            last_date: lastSession?.completed_at || null,
             perPeriod,
         };
     }).filter(s => s.total_sessions > 0).sort((a, b) => (b.avg_score || 0) - (a.avg_score || 0));
@@ -458,7 +458,7 @@ function AdminStats() {
             {
                 name: 'Все сессии',
                 data: sessions.map(s => {
-                    const period = assignPeriod(s.created_at, periods);
+                    const period = assignPeriod(s.completed_at, periods);
                     return {
                         'ID': s.id,
                         'ID участника': s.participant_id || s.user_id || '—',
@@ -467,7 +467,7 @@ function AdminStats() {
                         'Правильных': s.correct_q,
                         'Всего вопросов': s.total_q,
                         'Время (сек)': s.duration_sec,
-                        'Дата': new Date(s.created_at).toLocaleString('ru'),
+                        'Дата': new Date(s.completed_at).toLocaleString('ru'),
                     };
                 }),
             },
