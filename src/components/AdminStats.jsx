@@ -1,7 +1,8 @@
 /**
- * AdminStats — NIR Dashboard
- * - Configurable research periods (admin defines date ranges)
- * - Auto-assigns test sessions to periods by date
+ * AdminStats — НИР Dashboard (v2)
+ * - Research periods stored in PostgreSQL (research_periods table)
+ * - Aggregated stats via server-side RPC (no 1000-row limit)
+ * - Active participants only (those who actually used the system)
  * - KPI cards, score dynamics, error analysis, SUS + confidence
  * - XLSX export
  */
@@ -9,13 +10,14 @@ import { useState, useEffect, useCallback } from 'react';
 import {
     Card, Row, Col, Statistic, Table, Button, Select, DatePicker,
     Alert, Typography, Tag, Progress, Spin, Space, Divider, message,
-    Input, Modal, Popconfirm, Empty, Tooltip,
+    Input, Modal, Popconfirm, Empty, Tooltip, Badge,
 } from 'antd';
 import {
     DownloadOutlined, ReloadOutlined, TrophyOutlined,
     UserOutlined, FileTextOutlined, BarChartOutlined, FormOutlined,
     PlusOutlined, DeleteOutlined, EditOutlined, CalendarOutlined,
-    SettingOutlined,
+    SettingOutlined, CheckCircleOutlined, TeamOutlined,
+    ExperimentOutlined, SafetyOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { supabase } from '../services/supabase';
@@ -34,41 +36,20 @@ function roleBadge(role) {
     const map = {
         student: ['blue', 'Студент'], resident: ['purple', 'Ординатор'],
         doctor: ['green', 'Врач'], teacher: ['orange', 'Преподаватель'],
+        admin: ['red', 'Админ'],
     };
     const [color, label] = map[role] || ['default', role || '—'];
     return <Tag color={color}>{label}</Tag>;
 }
 
-/* ════════════════════════════════════════════════════════════════
-   Research Periods — stored in Supabase (research_periods table)
-   with localStorage fallback
-   ════════════════════════════════════════════════════════════════ */
-const STORAGE_KEY = 'nir_research_periods';
-const DEFAULT_PERIODS = [
-    { id: '1', name: 'T1 — Входное тестирование', color: '#1890ff', startDate: null, endDate: null },
-    { id: '2', name: 'T2 — После обучения', color: '#52c41a', startDate: null, endDate: null },
-    { id: '3', name: 'T3 — Отсроченный контроль', color: '#722ed1', startDate: null, endDate: null },
-];
-
-function loadPeriods() {
-    try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) return JSON.parse(saved);
-    } catch {}
-    return DEFAULT_PERIODS;
-}
-
-function savePeriods(periods) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(periods));
-}
-
 /** Assign a session to a period by its completed_at date */
 function assignPeriod(sessionDate, periods) {
+    if (!sessionDate) return null;
     const d = new Date(sessionDate);
     for (const p of periods) {
-        if (!p.startDate || !p.endDate) continue;
-        const start = new Date(p.startDate);
-        const end = new Date(p.endDate);
+        if (!p.start_date || !p.end_date) continue;
+        const start = new Date(p.start_date);
+        const end = new Date(p.end_date);
         end.setHours(23, 59, 59, 999);
         if (d >= start && d <= end) return p;
     }
@@ -100,8 +81,8 @@ function downloadWorkbook(sheets, filename) {
 /* ════════════════════════════════════════════════════════════════
    Survey export
    ════════════════════════════════════════════════════════════════ */
-const SUS_KEYS = [1,2,3,4,5,6,7,8,9,10].map(i => `sus_${i}`);
-const CONF_KEYS = ['c1','c2','c3','c4','c5'];
+const SUS_KEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => `sus_${i}`);
+const CONF_KEYS = ['c1', 'c2', 'c3', 'c4', 'c5'];
 
 function buildSurveySheets(surveys) {
     const fmt = (s) => new Date(s.created_at).toLocaleString('ru');
@@ -109,7 +90,7 @@ function buildSurveySheets(surveys) {
     const susRows = surveys.filter(s => s.survey_type === 'sus').map(s => {
         const r = s.responses || {};
         const row = { 'ID участника': idCol(s), 'Дата': fmt(s), 'SUS балл': s.score ?? '—' };
-        SUS_KEYS.forEach((k, i) => { row[`Вопрос ${i+1}`] = r[k] ?? '—'; });
+        SUS_KEYS.forEach((k, i) => { row[`Вопрос ${i + 1}`] = r[k] ?? '—'; });
         return row;
     });
     const confPreRows = surveys.filter(s => s.survey_type === 'confidence_pre').map(s => {
@@ -117,7 +98,7 @@ function buildSurveySheets(surveys) {
         const vals = CONF_KEYS.map(k => Number(r[k]) || 0).filter(v => v > 0);
         const avg = vals.length ? round(mean(vals)) : '—';
         const row = { 'ID участника': idCol(s), 'Дата': fmt(s), 'Среднее (1-5)': avg };
-        CONF_KEYS.forEach((k, i) => { row[`C${i+1}`] = r[k] ?? '—'; });
+        CONF_KEYS.forEach((k, i) => { row[`C${i + 1}`] = r[k] ?? '—'; });
         return row;
     });
     const confPostRows = surveys.filter(s => s.survey_type === 'confidence_post').map(s => {
@@ -125,7 +106,7 @@ function buildSurveySheets(surveys) {
         const vals = CONF_KEYS.map(k => Number(r[k]) || 0).filter(v => v > 0);
         const avg = vals.length ? round(mean(vals)) : '—';
         const row = { 'ID участника': idCol(s), 'Дата': fmt(s), 'Среднее (1-5)': avg };
-        CONF_KEYS.forEach((k, i) => { row[`C${i+1}`] = r[k] ?? '—'; });
+        CONF_KEYS.forEach((k, i) => { row[`C${i + 1}`] = r[k] ?? '—'; });
         return row;
     });
     const demoRows = surveys.filter(s => s.survey_type === 'demographics').map(s => {
@@ -156,54 +137,76 @@ function buildSurveySheets(surveys) {
 }
 
 /* ════════════════════════════════════════════════════════════════
-   Period Manager Component
+   Period Manager Component — saves to PostgreSQL
    ════════════════════════════════════════════════════════════════ */
-function PeriodManager({ periods, onChange }) {
-    const [editModal, setEditModal] = useState(null); // null or period object
+function PeriodManager({ periods, onChange, saving }) {
+    const [editModal, setEditModal] = useState(null);
     const [editName, setEditName] = useState('');
     const [editDates, setEditDates] = useState(null);
 
-    const addPeriod = () => {
+    const addPeriod = async () => {
         const newPeriod = {
-            id: String(Date.now()),
             name: `Период ${periods.length + 1}`,
             color: ['#1890ff', '#52c41a', '#722ed1', '#fa8c16', '#eb2f96', '#13c2c2'][periods.length % 6],
-            startDate: null,
-            endDate: null,
+            start_date: null,
+            end_date: null,
+            sort_order: periods.length + 1,
         };
-        onChange([...periods, newPeriod]);
+        const { data, error } = await supabase.from('research_periods').insert(newPeriod).select().single();
+        if (error) {
+            message.error('Ошибка создания периода');
+            return;
+        }
+        onChange([...periods, data]);
     };
 
-    const removePeriod = (id) => {
+    const removePeriod = async (id) => {
+        const { error } = await supabase.from('research_periods').delete().eq('id', id);
+        if (error) {
+            message.error('Ошибка удаления');
+            return;
+        }
         onChange(periods.filter(p => p.id !== id));
     };
 
     const openEdit = (period) => {
         setEditModal(period);
         setEditName(period.name);
-        setEditDates(period.startDate && period.endDate
-            ? [dayjs(period.startDate), dayjs(period.endDate)]
+        setEditDates(period.start_date && period.end_date
+            ? [dayjs(period.start_date), dayjs(period.end_date)]
             : null);
     };
 
-    const saveEdit = () => {
-        onChange(periods.map(p => p.id === editModal.id ? {
-            ...p,
+    const saveEdit = async () => {
+        const updates = {
             name: editName,
-            startDate: editDates?.[0]?.toISOString() || null,
-            endDate: editDates?.[1]?.toISOString() || null,
-        } : p));
+            start_date: editDates?.[0]?.toISOString() || null,
+            end_date: editDates?.[1]?.toISOString() || null,
+        };
+        const { error } = await supabase.from('research_periods').update(updates).eq('id', editModal.id);
+        if (error) {
+            message.error('Ошибка сохранения');
+            return;
+        }
+        onChange(periods.map(p => p.id === editModal.id ? { ...p, ...updates } : p));
         setEditModal(null);
+        message.success('Период сохранён');
     };
 
     const fmtDate = (d) => d ? new Date(d).toLocaleDateString('ru') : '—';
 
     return (
         <Card
-            title={<><CalendarOutlined /> Периоды исследования</>}
+            title={<><CalendarOutlined /> Периоды исследования <Tag color="green">PostgreSQL</Tag></>}
             size="small"
             extra={<Button size="small" icon={<PlusOutlined />} onClick={addPeriod}>Добавить</Button>}
         >
+            <Alert
+                type="info"
+                showIcon
+                message="Периоды хранятся в базе данных и доступны для всех администраторов"
+                style={{ marginBottom: 12, fontSize: 12 }}
+            />
             {periods.length === 0 && (
                 <Empty description="Нет периодов. Добавьте период, чтобы распределить сессии по этапам." image={Empty.PRESENTED_IMAGE_SIMPLE} />
             )}
@@ -217,7 +220,7 @@ function PeriodManager({ periods, onChange }) {
                         <div>
                             <Text strong style={{ display: 'block' }}>{p.name}</Text>
                             <Text type="secondary" style={{ fontSize: 11 }}>
-                                {p.startDate ? `${fmtDate(p.startDate)} — ${fmtDate(p.endDate)}` : 'Даты не заданы'}
+                                {p.start_date ? `${fmtDate(p.start_date)} — ${fmtDate(p.end_date)}` : 'Даты не заданы'}
                             </Text>
                         </div>
                     </div>
@@ -266,28 +269,32 @@ function AdminStats() {
     const [loading, setLoading] = useState(false);
     const [sessions, setSessions] = useState([]);
     const [surveys, setSurveys] = useState([]);
-    const [profiles, setProfiles] = useState([]);
+    const [profiles, setProfiles] = useState([]);       // Only active participants
+    const [dashStats, setDashStats] = useState(null);    // Aggregated server stats
+    const [achievements, setAchievements] = useState([]);
     const [dateRange, setDateRange] = useState(null);
-    const [periods, setPeriods] = useState(loadPeriods);
+    const [periods, setPeriods] = useState([]);
     const [showPeriodSettings, setShowPeriodSettings] = useState(false);
-
-    const handlePeriodsChange = useCallback((newPeriods) => {
-        setPeriods(newPeriods);
-        savePeriods(newPeriods);
-    }, []);
 
     /* ── load ────────────────────────────────────────────────── */
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const [sessRes, survRes, partRes] = await Promise.all([
+            const [sessRes, survRes, activeRes, statsRes, periodRes, achRes] = await Promise.all([
                 supabase.from('test_sessions').select('*').order('completed_at', { ascending: false }),
                 supabase.from('survey_responses').select('*').order('created_at', { ascending: false }),
-                supabase.from('participants').select('*'),
+                supabase.rpc('get_active_participants'),
+                supabase.rpc('get_dashboard_stats'),
+                supabase.from('research_periods').select('*').order('sort_order'),
+                supabase.from('achievements').select('*').order('created_at', { ascending: false }),
             ]);
+
             setSessions(sessRes.data || []);
             setSurveys(survRes.data || []);
-            setProfiles(partRes.data || []);
+            setProfiles(activeRes.data || []);
+            setDashStats(statsRes.data || null);
+            setPeriods(periodRes.data || []);
+            setAchievements(achRes.data || []);
         } catch (e) {
             message.error('Ошибка загрузки: ' + e.message);
         }
@@ -328,7 +335,7 @@ function AdminStats() {
         ? `${periodsWithData[0].name.split('—')[0].trim()} → ${periodsWithData[1].name.split('—')[0].trim()}`
         : 'Дельта';
 
-    /** Get the identity ID from a session (participant_id preferred, then user_id) */
+    /** Get the identity ID from a session */
     const getSessionIdentity = (s) => s.participant_id || s.user_id;
 
     // Paired users between first two periods
@@ -392,43 +399,64 @@ function AdminStats() {
     const avgConfPre = round(getConfAvg(confPre));
     const avgConfPost = round(getConfAvg(confPost));
 
-    // Participants by role
-    const byRole = profiles.reduce((acc, p) => {
-        acc[p.role || 'unknown'] = (acc[p.role || 'unknown'] || 0) + 1;
+    // Stats from RPC (accurate counts)
+    const totalParticipants = dashStats?.total_participants || 0;
+    const activeParticipants = dashStats?.active_participants || profiles.length;
+    const byRoleActive = dashStats?.by_role || {};
+    const surveysByType = dashStats?.surveys_by_type || {};
+
+    // Achievements summary
+    const achievementsByType = achievements.reduce((acc, a) => {
+        acc[a.achievement_type || a.type || 'unknown'] = (acc[a.achievement_type || a.type || 'unknown'] || 0) + 1;
         return acc;
     }, {});
 
-    /* ── Student progress table ──────────────────────────────── */
-    const studentProgress = profiles.map(profile => {
-        const userSessions = filtered.filter(s => s.participant_id === profile.id || s.user_id === profile.id);
-        const scores = userSessions.map(s => s.score).filter(v => v != null);
-        const lastSession = userSessions[0]; // already sorted by completed_at desc
+    /* ── Student progress table (active participants only) ──── */
+    const studentProgress = profiles
+        .filter(p => p.role !== 'admin')
+        .map(profile => {
+            const userSessions = filtered.filter(s => s.participant_id === profile.id || s.user_id === profile.id);
+            const scores = userSessions.map(s => s.score).filter(v => v != null);
+            const lastSession = userSessions[0];
+            const userSurveys = surveys.filter(s => s.participant_id === profile.id || s.user_id === profile.id);
+            const userAchievements = achievements.filter(a => a.participant_id === profile.id || a.user_id === profile.id);
 
-        // Per-period scores
-        const perPeriod = {};
-        periods.forEach(p => {
-            const pSess = (sessionsByPeriod[p.id] || []).filter(s => s.participant_id === profile.id || s.user_id === profile.id);
-            const pScores = pSess.map(s => s.score).filter(v => v != null);
-            perPeriod[p.id] = pScores.length ? round(mean(pScores)) : null;
+            // Per-period scores
+            const perPeriod = {};
+            periods.forEach(p => {
+                const pSess = (sessionsByPeriod[p.id] || []).filter(s => s.participant_id === profile.id || s.user_id === profile.id);
+                const pScores = pSess.map(s => s.score).filter(v => v != null);
+                perPeriod[p.id] = pScores.length ? round(mean(pScores)) : null;
+            });
+
+            return {
+                user_id: profile.id,
+                code: profile.code || null,
+                full_name: profile.full_name || '—',
+                role: profile.role,
+                total_sessions: userSessions.length,
+                total_surveys: userSurveys.length,
+                total_achievements: userAchievements.length,
+                avg_score: scores.length ? round(mean(scores)) : null,
+                best_score: scores.length ? Math.max(...scores) : null,
+                last_date: lastSession?.completed_at || null,
+                perPeriod,
+            };
+        })
+        .sort((a, b) => {
+            // Sort: those with sessions first (by avg_score desc), then by surveys, then by achievements
+            if (a.total_sessions !== b.total_sessions) return b.total_sessions - a.total_sessions;
+            return (b.avg_score || 0) - (a.avg_score || 0);
         });
-
-        return {
-            user_id: profile.id,
-            code: profile.code || null,
-            full_name: profile.full_name || '—',
-            role: profile.role,
-            total_sessions: userSessions.length,
-            avg_score: scores.length ? round(mean(scores)) : null,
-            best_score: scores.length ? Math.max(...scores) : null,
-            last_date: lastSession?.completed_at || null,
-            perPeriod,
-        };
-    }).filter(s => s.total_sessions > 0).sort((a, b) => (b.avg_score || 0) - (a.avg_score || 0));
 
     /* ── exports ─────────────────────────────────────────────── */
     const handleExportSessions = () => {
         const summaryData = [
-            { Показатель: 'Всего участников', Значение: profiles.length },
+            { Показатель: 'Всего зарегистрировано', Значение: totalParticipants },
+            { Показатель: 'Активных участников', Значение: activeParticipants },
+            { Показатель: 'Тестовых сессий', Значение: sessions.length },
+            { Показатель: 'Анкет заполнено', Значение: surveys.length },
+            { Показатель: 'Достижений выдано', Значение: achievements.length },
             ...periodScores.map(p => ({ Показатель: `Сессий (${p.name})`, Значение: p.sessions.length })),
             ...periodScores.map(p => ({ Показатель: `Средний балл ${p.name} (%)`, Значение: p.avg || 0 })),
             { Показатель: 'Участников с парными данными', Значение: pairedUsers.length },
@@ -478,7 +506,9 @@ function AdminStats() {
                         'Код': s.code || '—',
                         'ФИО': s.full_name,
                         'Роль': s.role || '—',
-                        'Всего сессий': s.total_sessions,
+                        'Тестов': s.total_sessions,
+                        'Анкет': s.total_surveys,
+                        'Достижений': s.total_achievements,
                         'Средний балл (%)': s.avg_score,
                         'Лучший (%)': s.best_score,
                         'Последний тест': s.last_date ? new Date(s.last_date).toLocaleDateString('ru') : '—',
@@ -488,6 +518,15 @@ function AdminStats() {
                     });
                     return row;
                 }),
+            },
+            {
+                name: 'Достижения',
+                data: achievements.map(a => ({
+                    'ID участника': a.participant_id || a.user_id || '—',
+                    'Тип': a.achievement_type || a.type || '—',
+                    'Название': a.title || a.name || '—',
+                    'Дата': new Date(a.created_at).toLocaleString('ru'),
+                })),
             },
             {
                 name: 'Анализ ошибок',
@@ -514,6 +553,7 @@ function AdminStats() {
 
     /* ── table columns ───────────────────────────────────────── */
     const deltaColumns = [
+        { title: 'Код', dataIndex: 'code', width: 90, render: (v) => v ? <Tag style={{ fontFamily: 'monospace' }}>{v}</Tag> : '—' },
         { title: 'Роль', dataIndex: 'role', render: roleBadge, width: 130 },
         { title: periodsWithData[0]?.name.split('—')[0].trim() || 'P1', dataIndex: 'p1_score', sorter: (a, b) => a.p1_score - b.p1_score },
         { title: periodsWithData[1]?.name.split('—')[0].trim() || 'P2', dataIndex: 'p2_score', sorter: (a, b) => a.p2_score - b.p2_score },
@@ -536,19 +576,20 @@ function AdminStats() {
     // Student progress columns
     const progressColumns = [
         { title: 'Код', dataIndex: 'code', width: 90, render: (v) => v ? <Tag style={{ fontFamily: 'monospace' }}>{v}</Tag> : '—' },
-        { title: 'ФИО', dataIndex: 'full_name', ellipsis: true, width: 180 },
-        { title: 'Роль', dataIndex: 'role', render: roleBadge, width: 120 },
-        { title: 'Сессий', dataIndex: 'total_sessions', sorter: (a, b) => a.total_sessions - b.total_sessions, width: 80 },
+        { title: 'ФИО', dataIndex: 'full_name', ellipsis: true, width: 160 },
+        { title: 'Роль', dataIndex: 'role', render: roleBadge, width: 110 },
+        { title: 'Тестов', dataIndex: 'total_sessions', sorter: (a, b) => a.total_sessions - b.total_sessions, width: 70 },
+        { title: 'Анкет', dataIndex: 'total_surveys', sorter: (a, b) => a.total_surveys - b.total_surveys, width: 70 },
         {
             title: 'Средний', dataIndex: 'avg_score', sorter: (a, b) => (a.avg_score || 0) - (b.avg_score || 0),
-            defaultSortOrder: 'descend', width: 90,
+            defaultSortOrder: 'descend', width: 85,
             render: (v) => v != null ? <Tag color={v >= 70 ? 'green' : v >= 50 ? 'orange' : 'red'}>{v}%</Tag> : '—',
         },
         {
-            title: 'Лучший', dataIndex: 'best_score', width: 90,
+            title: 'Лучший', dataIndex: 'best_score', width: 80,
             render: (v) => v != null ? `${v}%` : '—',
         },
-        ...periods.filter(p => p.startDate && p.endDate).map(p => ({
+        ...periods.filter(p => p.start_date && p.end_date).map(p => ({
             title: <Tooltip title={p.name}>{p.name.split('—')[0].trim()}</Tooltip>,
             key: `period_${p.id}`,
             width: 80,
@@ -565,14 +606,20 @@ function AdminStats() {
         },
     ];
 
-    if (loading) return <div style={{ padding: 48, textAlign: 'center' }}><Spin size="large" /></div>;
+    if (loading) return <div style={{ padding: 48, textAlign: 'center' }}><Spin size="large" tip="Загрузка данных из PostgreSQL..." /></div>;
 
+    /* ════════════════════════════════════════════════════════════
+       Render
+       ════════════════════════════════════════════════════════════ */
     return (
         <div style={{ padding: '0 0 32px' }}>
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
                 <Title level={4} style={{ margin: 0 }}>
                     <BarChartOutlined /> Дашборд НИР
+                    <Tag color="green" style={{ marginLeft: 8, fontSize: 11, verticalAlign: 'middle' }}>
+                        PostgreSQL
+                    </Tag>
                 </Title>
                 <Space wrap>
                     <RangePicker onChange={setDateRange} format="DD.MM.YYYY" placeholder={['Начало', 'Конец']} />
@@ -596,12 +643,12 @@ function AdminStats() {
             {/* Period settings (collapsible) */}
             {showPeriodSettings && (
                 <div style={{ marginBottom: 16 }}>
-                    <PeriodManager periods={periods} onChange={handlePeriodsChange} />
+                    <PeriodManager periods={periods} onChange={setPeriods} />
                 </div>
             )}
 
             {/* Empty state */}
-            {sessions.length === 0 && profiles.length === 0 && (
+            {sessions.length === 0 && activeParticipants === 0 && (
                 <Alert
                     type="info"
                     showIcon
@@ -611,34 +658,104 @@ function AdminStats() {
                 />
             )}
 
-            {/* KPI Cards */}
-            <Row gutter={[16, 16]}>
+            {/* KPI Cards — Row 1: Activity overview */}
+            <Row gutter={[12, 12]}>
                 <Col xs={12} sm={6}>
-                    <Card><Statistic title="Участников" value={profiles.length} prefix={<UserOutlined />} /></Card>
-                </Col>
-                <Col xs={12} sm={6}>
-                    <Card><Statistic title="Сессий (всего)" value={filtered.length} prefix={<FileTextOutlined />} /></Card>
-                </Col>
-                <Col xs={12} sm={6}>
-                    <Card>
+                    <Card size="small">
                         <Statistic
-                            title={`Дельта ${deltaLabel}`}
+                            title={<><TeamOutlined /> Активные участники</>}
+                            value={activeParticipants}
+                            suffix={<Text type="secondary" style={{ fontSize: 12 }}>/ {totalParticipants}</Text>}
+                            valueStyle={{ color: '#635bff' }}
+                        />
+                    </Card>
+                </Col>
+                <Col xs={12} sm={6}>
+                    <Card size="small">
+                        <Statistic
+                            title={<><FileTextOutlined /> Тестовые сессии</>}
+                            value={filtered.length}
+                            valueStyle={{ color: '#1890ff' }}
+                        />
+                        {filtered.length > 0 && (
+                            <Text type="secondary" style={{ fontSize: 11 }}>
+                                Средний балл: {round(mean(filtered.map(s => s.score).filter(v => v != null)))}%
+                            </Text>
+                        )}
+                    </Card>
+                </Col>
+                <Col xs={12} sm={6}>
+                    <Card size="small">
+                        <Statistic
+                            title={<><FormOutlined /> Анкеты</>}
+                            value={surveys.length}
+                            valueStyle={{ color: '#52c41a' }}
+                        />
+                        {Object.keys(surveysByType).length > 0 && (
+                            <Text type="secondary" style={{ fontSize: 11 }}>
+                                {Object.entries(surveysByType).map(([t, c]) => `${t}: ${c}`).join(', ')}
+                            </Text>
+                        )}
+                    </Card>
+                </Col>
+                <Col xs={12} sm={6}>
+                    <Card size="small">
+                        <Statistic
+                            title={<><TrophyOutlined /> Достижения</>}
+                            value={achievements.length}
+                            valueStyle={{ color: '#faad14' }}
+                        />
+                    </Card>
+                </Col>
+            </Row>
+
+            {/* KPI Cards — Row 2: Research metrics */}
+            <Row gutter={[12, 12]} style={{ marginTop: 12 }}>
+                <Col xs={12} sm={6}>
+                    <Card size="small">
+                        <Statistic
+                            title="Дельта (тест)"
                             value={delta !== null ? delta : '—'}
                             suffix={delta !== null ? 'пп' : ''}
                             valueStyle={{ color: delta >= 20 ? '#52c41a' : delta >= 0 ? '#1890ff' : '#ff4d4f' }}
                         />
-                        <Text type="secondary" style={{ fontSize: 11 }}>Цель: ≥ 20 пп</Text>
+                        <Text type="secondary" style={{ fontSize: 10 }}>
+                            {delta !== null ? deltaLabel : 'Нужны данные в 2+ периодах'}
+                        </Text>
                     </Card>
                 </Col>
                 <Col xs={12} sm={6}>
-                    <Card>
+                    <Card size="small">
                         <Statistic
                             title="Средний SUS"
                             value={susScores.length ? avgSUS : '—'}
                             suffix={susScores.length ? '/ 100' : ''}
                             valueStyle={{ color: avgSUS >= 68 ? '#52c41a' : '#faad14' }}
                         />
-                        <Text type="secondary" style={{ fontSize: 11 }}>Цель: SUS ≥ 68</Text>
+                        <Text type="secondary" style={{ fontSize: 10 }}>
+                            {susScores.length ? `Цель: ≥ 68 (n=${susScores.length})` : 'Нет данных SUS'}
+                        </Text>
+                    </Card>
+                </Col>
+                <Col xs={12} sm={6}>
+                    <Card size="small">
+                        <Statistic
+                            title="Уверенность (до)"
+                            value={confPre.length ? avgConfPre : '—'}
+                            suffix={confPre.length ? '/ 5' : ''}
+                        />
+                        <Text type="secondary" style={{ fontSize: 10 }}>n={confPre.length}</Text>
+                    </Card>
+                </Col>
+                <Col xs={12} sm={6}>
+                    <Card size="small">
+                        <Statistic
+                            title="Уверенность (после)"
+                            value={confPost.length ? avgConfPost : '—'}
+                            suffix={confPost.length ? '/ 5' : ''}
+                            valueStyle={{ color: avgConfPost > avgConfPre ? '#52c41a' : undefined }}
+                        />
+                        <Text type="secondary" style={{ fontSize: 10 }}>n={confPost.length}</Text>
                     </Card>
                 </Col>
             </Row>
@@ -646,14 +763,19 @@ function AdminStats() {
             <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
                 {/* Score dynamics by period */}
                 <Col xs={24} md={12}>
-                    <Card title="Динамика по периодам">
-                        {periodScores.length === 0 && (
-                            <Alert type="info" message="Настройте периоды через кнопку «Периоды» вверху" showIcon />
+                    <Card title="Динамика по периодам" size="small">
+                        {periodScores.every(p => !p.start_date || !p.end_date) && (
+                            <Alert
+                                type="warning"
+                                message="Задайте даты периодов через кнопку «Периоды» вверху"
+                                showIcon
+                                style={{ marginBottom: 12 }}
+                            />
                         )}
                         {periodScores.map(row => (
                             <div key={row.id} style={{ marginBottom: 12 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                    <Text>{row.name}</Text>
+                                    <Text style={{ fontSize: 13 }}>{row.name}</Text>
                                     <Text strong>
                                         {row.scores.length ? `${row.avg}%` : '—'}
                                         <Text type="secondary" style={{ fontSize: 11, marginLeft: 4 }}>
@@ -672,55 +794,63 @@ function AdminStats() {
                         <Divider style={{ margin: '8px 0' }} />
                         <Row>
                             <Col span={12}>
-                                <Statistic title="Парных участников" value={pairedUsers.length} />
+                                <Statistic title="Парных участников" value={pairedUsers.length} valueStyle={{ fontSize: 20 }} />
                             </Col>
                             <Col span={12}>
                                 <Statistic
                                     title="Дельта средняя"
                                     value={delta !== null ? delta : '—'}
                                     suffix={delta !== null ? 'пп' : ''}
-                                    valueStyle={{ color: delta >= 20 ? '#52c41a' : '#faad14' }}
+                                    valueStyle={{ color: delta >= 20 ? '#52c41a' : '#faad14', fontSize: 20 }}
                                 />
                             </Col>
                         </Row>
                     </Card>
                 </Col>
 
-                {/* SUS + Confidence */}
+                {/* Active participants by role + Achievements */}
                 <Col xs={24} md={12}>
-                    <Card title="Удовлетворённость и уверенность">
-                        <div style={{ marginBottom: 16 }}>
-                            <Text strong>SUS (n={susScores.length})</Text>
-                            <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
-                                <Statistic title="Средний SUS" value={susScores.length ? avgSUS : '—'} />
-                                <Statistic
-                                    title="SUS >= 68"
-                                    value={susScores.length ? `${round((sus68 / susScores.length) * 100)}%` : '—'}
-                                    valueStyle={{ color: sus68 / (susScores.length || 1) >= 0.5 ? '#52c41a' : '#faad14' }}
-                                />
-                            </div>
-                            {susScores.length > 0 && (
-                                <Progress
-                                    percent={avgSUS}
-                                    strokeColor={avgSUS >= 85 ? '#52c41a' : avgSUS >= 68 ? '#1890ff' : '#faad14'}
-                                    showInfo={false}
-                                    style={{ marginTop: 8 }}
-                                />
-                            )}
-                        </div>
-                        <Divider style={{ margin: '8px 0' }} />
-                        <Text strong>Самооценка уверенности (1–5)</Text>
-                        <Row gutter={16} style={{ marginTop: 8 }}>
+                    <Card title="Состав активных участников" size="small">
+                        <Row gutter={16}>
                             <Col span={12}>
-                                <Statistic title="До обучения" value={confPre.length ? avgConfPre : '—'}
-                                    suffix={confPre.length ? '/ 5' : ''} />
+                                <Text strong style={{ display: 'block', marginBottom: 8 }}>По ролям:</Text>
+                                {Object.entries(byRoleActive).length === 0 ? (
+                                    <Text type="secondary">Нет данных</Text>
+                                ) : (
+                                    Object.entries(byRoleActive).map(([role, count]) => (
+                                        <div key={role} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                                            {roleBadge(role)}
+                                            <Text strong>{count}</Text>
+                                        </div>
+                                    ))
+                                )}
                             </Col>
                             <Col span={12}>
-                                <Statistic title="После обучения" value={confPost.length ? avgConfPost : '—'}
-                                    suffix={confPost.length ? '/ 5' : ''}
-                                    valueStyle={{ color: avgConfPost > avgConfPre ? '#52c41a' : undefined }} />
+                                <Text strong style={{ display: 'block', marginBottom: 8 }}>Анкеты:</Text>
+                                {Object.entries(surveysByType).length === 0 ? (
+                                    <Text type="secondary">Нет данных</Text>
+                                ) : (
+                                    Object.entries(surveysByType).map(([type, count]) => (
+                                        <div key={type} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                                            <Tag>{type}</Tag>
+                                            <Text strong>{count}</Text>
+                                        </div>
+                                    ))
+                                )}
                             </Col>
                         </Row>
+                        {Object.keys(achievementsByType).length > 0 && (
+                            <>
+                                <Divider style={{ margin: '8px 0' }} />
+                                <Text strong style={{ display: 'block', marginBottom: 8 }}>Достижения по типам:</Text>
+                                {Object.entries(achievementsByType).map(([type, count]) => (
+                                    <div key={type} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                                        <Tag color="gold"><TrophyOutlined /> {type}</Tag>
+                                        <Text strong>{count}</Text>
+                                    </div>
+                                ))}
+                            </>
+                        )}
                     </Card>
                 </Col>
             </Row>
@@ -728,16 +858,16 @@ function AdminStats() {
             {/* Student progress table */}
             <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
                 <Col span={24}>
-                    <Card title={`Прогресс студентов (n=${studentProgress.length})`}>
+                    <Card title={`Активные участники (n=${studentProgress.length})`} size="small">
                         {studentProgress.length === 0 ? (
-                            <Alert type="info" message="Нет участников с пройденными тестами" showIcon />
+                            <Alert type="info" message="Нет активных участников" showIcon />
                         ) : (
                             <Table
                                 dataSource={studentProgress}
                                 columns={progressColumns}
                                 rowKey="user_id"
                                 size="small"
-                                pagination={{ pageSize: 15 }}
+                                pagination={{ pageSize: 20, showSizeChanger: true, pageSizeOptions: ['10', '20', '50'] }}
                                 scroll={{ x: true }}
                             />
                         )}
@@ -748,9 +878,9 @@ function AdminStats() {
             <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
                 {/* Delta per user */}
                 <Col xs={24} lg={14}>
-                    <Card title={`Дельта по участникам (n=${userDeltas.length})`}>
+                    <Card title={`Дельта по участникам (n=${userDeltas.length})`} size="small">
                         {userDeltas.length === 0 ? (
-                            <Alert type="info" message="Нет участников с данными в двух периодах" showIcon />
+                            <Alert type="info" message="Нет участников с данными в двух периодах. Задайте даты периодов и дождитесь тестирования." showIcon />
                         ) : (
                             <Table
                                 dataSource={userDeltas}
@@ -766,7 +896,7 @@ function AdminStats() {
 
                 {/* Error analysis */}
                 <Col xs={24} lg={10}>
-                    <Card title="Анализ ошибок (топ-20)">
+                    <Card title="Анализ ошибок (топ-20)" size="small">
                         {errorData.length === 0 ? (
                             <Alert type="info" message="Нет данных об ошибках" showIcon />
                         ) : (
@@ -783,60 +913,66 @@ function AdminStats() {
                 </Col>
             </Row>
 
+            {/* KPI summary */}
             <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-                {/* Participants by role */}
-                <Col xs={24} md={12}>
-                    <Card title="Состав участников">
-                        {profiles.length === 0 ? (
-                            <Alert type="info" message="Нет зарегистрированных участников" showIcon />
-                        ) : (
-                            Object.entries(byRole).map(([role, count]) => (
-                                <div key={role} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                                    {roleBadge(role)}
-                                    <Text strong>{count}</Text>
-                                </div>
-                            ))
-                        )}
-                    </Card>
-                </Col>
-
-                {/* KPI summary */}
-                <Col xs={24} md={12}>
-                    <Card title="Сводка КПЭ НИР">
-                        {[
-                            {
-                                kpi: 'Участники (цель ≥ 400)',
-                                fact: `${profiles.length} / 400`,
-                                ok: profiles.length >= 400,
-                            },
-                            {
-                                kpi: `Дельта ${deltaLabel} (цель ≥ 20 пп)`,
-                                fact: delta !== null ? `${delta} пп` : '—',
-                                ok: delta !== null && delta >= 20,
-                            },
-                            {
-                                kpi: 'SUS >= 68 (% участников)',
-                                fact: susScores.length ? `${round((sus68 / susScores.length) * 100)}%` : '—',
-                                ok: susScores.length > 0 && (sus68 / susScores.length) >= 0.5,
-                            },
-                            {
-                                kpi: 'Анкет SUS заполнено',
-                                fact: String(susScores.length),
-                                ok: null,
-                            },
-                            {
-                                kpi: 'Анкет демографии',
-                                fact: String(surveys.filter(s => s.survey_type === 'demographics').length),
-                                ok: null,
-                            },
-                        ].map(row => (
-                            <div key={row.kpi} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
-                                <Text style={{ fontSize: 12 }}>{row.kpi}</Text>
-                                <Tag color={row.ok === true ? 'green' : row.ok === false ? 'red' : 'blue'}>
-                                    {row.fact}
-                                </Tag>
-                            </div>
-                        ))}
+                <Col span={24}>
+                    <Card title={<><SafetyOutlined /> Сводка КПЭ НИР</>} size="small">
+                        <Row gutter={[16, 8]}>
+                            {[
+                                {
+                                    kpi: 'Активные участники (цель ≥ 50)',
+                                    fact: `${activeParticipants}`,
+                                    ok: activeParticipants >= 50,
+                                    progress: Math.min(100, Math.round((activeParticipants / 50) * 100)),
+                                },
+                                {
+                                    kpi: `Дельта ${deltaLabel} (цель ≥ 20 пп)`,
+                                    fact: delta !== null ? `${delta} пп` : '—',
+                                    ok: delta !== null && delta >= 20,
+                                    progress: delta !== null ? Math.min(100, Math.round((delta / 20) * 100)) : 0,
+                                },
+                                {
+                                    kpi: 'SUS >= 68',
+                                    fact: susScores.length ? `${avgSUS} (${round((sus68 / susScores.length) * 100)}% ≥ 68)` : '—',
+                                    ok: susScores.length > 0 && avgSUS >= 68,
+                                    progress: susScores.length ? Math.min(100, Math.round((avgSUS / 68) * 100)) : 0,
+                                },
+                                {
+                                    kpi: 'Анкет демографии заполнено',
+                                    fact: String(surveysByType.demographics || 0),
+                                    ok: (surveysByType.demographics || 0) >= 10,
+                                    progress: Math.min(100, Math.round(((surveysByType.demographics || 0) / 50) * 100)),
+                                },
+                                {
+                                    kpi: 'Тестовых сессий проведено',
+                                    fact: String(sessions.length),
+                                    ok: sessions.length >= 20,
+                                    progress: Math.min(100, Math.round((sessions.length / 50) * 100)),
+                                },
+                            ].map(row => (
+                                <Col xs={24} sm={12} md={8} key={row.kpi}>
+                                    <div style={{
+                                        padding: '12px 16px',
+                                        borderRadius: 8,
+                                        background: row.ok === true ? '#f6ffed' : row.ok === false ? '#fff2f0' : '#f0f5ff',
+                                        border: `1px solid ${row.ok === true ? '#b7eb8f' : row.ok === false ? '#ffccc7' : '#adc6ff'}`,
+                                    }}>
+                                        <Text style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>{row.kpi}</Text>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <Text strong style={{ fontSize: 16 }}>{row.fact}</Text>
+                                            {row.ok === true && <CheckCircleOutlined style={{ color: '#52c41a' }} />}
+                                        </div>
+                                        <Progress
+                                            percent={row.progress}
+                                            size="small"
+                                            strokeColor={row.ok === true ? '#52c41a' : row.ok === false ? '#ff4d4f' : '#1890ff'}
+                                            showInfo={false}
+                                            style={{ marginTop: 4 }}
+                                        />
+                                    </div>
+                                </Col>
+                            ))}
+                        </Row>
                     </Card>
                 </Col>
             </Row>
