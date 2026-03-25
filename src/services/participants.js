@@ -1,36 +1,34 @@
 import { supabase } from './supabase';
 
 /**
- * Validate participant credentials against the database.
- * Password is stored per-row in the `participants` table.
- * @param {string} code — e.g. "AT-0001" or "ADMIN"
+ * Validate participant credentials via server-side RPC.
+ * Password is checked in PostgreSQL — never exposed to the client.
+ * @param {string} code — e.g. "AT-0001" or "AT-ADM"
  * @param {string} password
  * @returns {{ participant: object|null, error: string|null }}
  */
 export async function loginParticipant(code, password) {
   const normalized = code.trim().toUpperCase();
 
-  // Validate format: AT-XXXX or AT-ADM
-  if (!/^AT-(\d{4}|ADM)$/.test(normalized)) {
+  // Basic format check
+  if (!/^AT-[A-Z0-9]{1,4}$/.test(normalized)) {
     return { participant: null, error: 'Неверный формат ID' };
   }
 
-  const { data, error } = await supabase
-    .from('participants')
-    .select('*')
-    .eq('code', normalized)
-    .single();
+  const { data, error } = await supabase.rpc('login_participant', {
+    p_code: normalized,
+    p_password: password,
+  });
 
-  if (error || !data) {
-    return { participant: null, error: 'ID участника не найден' };
+  if (error) {
+    return { participant: null, error: 'Ошибка сервера' };
   }
 
-  // Check password from DB
-  if (data.password && data.password !== password) {
-    return { participant: null, error: 'Неверный пароль' };
+  if (data?.error) {
+    return { participant: null, error: data.error };
   }
 
-  return { participant: data, error: null };
+  return { participant: data.participant, error: null };
 }
 
 /**
