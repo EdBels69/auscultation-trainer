@@ -272,6 +272,7 @@ function AdminStats() {
     const [profiles, setProfiles] = useState([]);       // Only active participants
     const [dashStats, setDashStats] = useState(null);    // Aggregated server stats
     const [achievements, setAchievements] = useState([]);
+    const [soundsMap, setSoundsMap] = useState({});      // id → {name, category, description}
     const [dateRange, setDateRange] = useState(null);
     const [periods, setPeriods] = useState([]);
     const [showPeriodSettings, setShowPeriodSettings] = useState(false);
@@ -280,13 +281,14 @@ function AdminStats() {
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const [sessRes, survRes, activeRes, statsRes, periodRes, achRes] = await Promise.all([
+            const [sessRes, survRes, activeRes, statsRes, periodRes, achRes, soundsRes] = await Promise.all([
                 supabase.from('test_sessions').select('*').order('completed_at', { ascending: false }),
                 supabase.from('survey_responses').select('*').order('created_at', { ascending: false }),
                 supabase.rpc('get_active_participants'),
                 supabase.rpc('get_dashboard_stats'),
                 supabase.from('research_periods').select('*').order('sort_order'),
                 supabase.from('achievements').select('*').order('created_at', { ascending: false }),
+                supabase.from('sounds').select('id,name,category,description'),
             ]);
 
             setSessions(sessRes.data || []);
@@ -295,6 +297,11 @@ function AdminStats() {
             setDashStats(statsRes.data || null);
             setPeriods(periodRes.data || []);
             setAchievements(achRes.data || []);
+
+            // Build sounds lookup map: id → sound info
+            const sMap = {};
+            (soundsRes.data || []).forEach(s => { sMap[s.id] = s; });
+            setSoundsMap(sMap);
         } catch (e) {
             message.error('Ошибка загрузки: ' + e.message);
         }
@@ -367,21 +374,53 @@ function AdminStats() {
         userDeltas.sort((a, b) => b.delta - a.delta);
     }
 
-    // Error analysis
-    const errorMap = {};
+    // ── Error analysis (with sound name resolution) ──
+    // Build per-sound stats: total times shown, errors, error rate, confusion targets
+    const soundStats = {};  // correct_answer_id → { name, category, total, errors, confusions: {id→count} }
     filtered.forEach(s => {
         (s.answers || []).forEach(a => {
+            const correctId = a.correct_answer;
+            const userId = a.user_answer;
             const isWrong = a.is_correct === false || a.is_correct === 0 || a.correct === false;
+            const soundInfo = soundsMap[correctId];
+            const soundName = soundInfo?.name || `Звук #${correctId}`;
+            const soundCat = soundInfo?.category || 'unknown';
+
+            if (!soundStats[correctId]) {
+                soundStats[correctId] = { id: correctId, name: soundName, category: soundCat, total: 0, errors: 0, confusions: {} };
+            }
+            soundStats[correctId].total += 1;
+
             if (isWrong) {
-                const key = a.sound_name || a.category || s.category || 'unknown';
-                errorMap[key] = (errorMap[key] || 0) + 1;
+                soundStats[correctId].errors += 1;
+                // Track what users confuse this sound with
+                const confusedWith = soundsMap[userId]?.name || `#${userId}`;
+                soundStats[correctId].confusions[confusedWith] = (soundStats[correctId].confusions[confusedWith] || 0) + 1;
             }
         });
     });
-    const errorData = Object.entries(errorMap)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 20)
-        .map(([name, count]) => ({ name, count }));
+
+    // Error data sorted by error count desc, with error rate
+    const errorData = Object.values(soundStats)
+        .filter(s => s.errors > 0)
+        .sort((a, b) => b.errors - a.errors)
+        .map(s => ({
+            name: s.name,
+            category: s.category === 'pulmonary' ? 'Лёгочные' : s.category === 'cardiac' ? 'Кардиальные' : s.category,
+            total: s.total,
+            errors: s.errors,
+            rate: round((s.errors / s.total) * 100, 0),
+            topConfusion: Object.entries(s.confusions).sort((a, b) => b[1] - a[1])[0]?.[0] || '—',
+        }));
+
+    // Category-level error summary
+    const categoryErrors = {};
+    Object.values(soundStats).forEach(s => {
+        const cat = s.category === 'pulmonary' ? 'Лёгочные' : s.category === 'cardiac' ? 'Кардиальные' : s.category;
+        if (!categoryErrors[cat]) categoryErrors[cat] = { total: 0, errors: 0 };
+        categoryErrors[cat].total += s.total;
+        categoryErrors[cat].errors += s.errors;
+    });
 
     // SUS
     const susResponses = surveys.filter(s => s.survey_type === 'sus' && s.score != null);
@@ -530,7 +569,14 @@ function AdminStats() {
             },
             {
                 name: 'Анализ ошибок',
-                data: errorData.map(e => ({ 'Звук / категория': e.name, 'Число ошибок': e.count })),
+                data: errorData.map(e => ({
+                    'Звук': e.name,
+                    'Категория': e.category,
+                    'Показан (раз)': e.total,
+                    'Ошибок': e.errors,
+                    '% ошибок': e.rate,
+                    'Чаще путают с': e.topConfusion,
+                })),
             },
             {
                 name: 'Участники',
@@ -565,11 +611,36 @@ function AdminStats() {
     ];
 
     const errorColumns = [
-        { title: 'Звук / категория', dataIndex: 'name', ellipsis: true },
+        { title: 'Звук', dataIndex: 'name', ellipsis: true, width: 200 },
         {
-            title: 'Ошибок', dataIndex: 'count',
-            sorter: (a, b) => a.count - b.count, defaultSortOrder: 'descend',
-            render: (v) => <Tag color={v > 10 ? 'red' : v > 5 ? 'orange' : 'default'}>{v}</Tag>,
+            title: 'Категория', dataIndex: 'category', width: 110,
+            render: (v) => <Tag color={v === 'Лёгочные' ? 'blue' : v === 'Кардиальные' ? 'red' : 'default'}>{v}</Tag>,
+        },
+        {
+            title: 'Показан', dataIndex: 'total', width: 75,
+            sorter: (a, b) => a.total - b.total,
+        },
+        {
+            title: 'Ошибок', dataIndex: 'errors', width: 75,
+            sorter: (a, b) => a.errors - b.errors, defaultSortOrder: 'descend',
+            render: (v) => <Tag color={v > 5 ? 'red' : v > 2 ? 'orange' : 'default'}>{v}</Tag>,
+        },
+        {
+            title: '% ошибок', dataIndex: 'rate', width: 90,
+            sorter: (a, b) => a.rate - b.rate,
+            render: (v) => (
+                <Progress
+                    percent={v}
+                    size="small"
+                    strokeColor={v > 60 ? '#ff4d4f' : v > 30 ? '#faad14' : '#52c41a'}
+                    format={(p) => `${p}%`}
+                    style={{ width: 70 }}
+                />
+            ),
+        },
+        {
+            title: 'Путают с', dataIndex: 'topConfusion', ellipsis: true, width: 180,
+            render: (v) => v !== '—' ? <Text type="secondary" style={{ fontSize: 12 }}>{v}</Text> : '—',
         },
     ];
 
@@ -894,24 +965,65 @@ function AdminStats() {
                     </Card>
                 </Col>
 
-                {/* Error analysis */}
+                {/* Error analysis — category summary */}
                 <Col xs={24} lg={10}>
-                    <Card title="Анализ ошибок (топ-20)" size="small">
-                        {errorData.length === 0 ? (
+                    <Card title="Ошибки по категориям" size="small">
+                        {Object.keys(categoryErrors).length === 0 ? (
                             <Alert type="info" message="Нет данных об ошибках" showIcon />
                         ) : (
+                            Object.entries(categoryErrors).map(([cat, data]) => {
+                                const rate = data.total ? round((data.errors / data.total) * 100, 0) : 0;
+                                return (
+                                    <div key={cat} style={{ marginBottom: 12 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                                            <Tag color={cat === 'Лёгочные' ? 'blue' : cat === 'Кардиальные' ? 'red' : 'default'}>{cat}</Tag>
+                                            <Text>
+                                                <Text strong>{data.errors}</Text> из {data.total} ответов
+                                                <Text type="secondary" style={{ marginLeft: 8 }}>({rate}%)</Text>
+                                            </Text>
+                                        </div>
+                                        <Progress
+                                            percent={rate}
+                                            strokeColor={rate > 50 ? '#ff4d4f' : rate > 30 ? '#faad14' : '#52c41a'}
+                                            showInfo={false}
+                                        />
+                                    </div>
+                                );
+                            })
+                        )}
+                        <Divider style={{ margin: '8px 0' }} />
+                        <Text type="secondary" style={{ fontSize: 11 }}>
+                            Всего ответов: {Object.values(soundStats).reduce((s, v) => s + v.total, 0)},
+                            ошибок: {Object.values(soundStats).reduce((s, v) => s + v.errors, 0)},
+                            средний % ошибок: {
+                                (() => {
+                                    const t = Object.values(soundStats).reduce((s, v) => s + v.total, 0);
+                                    const e = Object.values(soundStats).reduce((s, v) => s + v.errors, 0);
+                                    return t ? round((e / t) * 100, 0) : 0;
+                                })()
+                            }%
+                        </Text>
+                    </Card>
+                </Col>
+            </Row>
+
+            {/* Detailed error analysis table */}
+            {errorData.length > 0 && (
+                <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+                    <Col span={24}>
+                        <Card title={`Детальный анализ ошибок по звукам (n=${errorData.length})`} size="small">
                             <Table
                                 dataSource={errorData}
                                 columns={errorColumns}
                                 rowKey="name"
                                 size="small"
-                                pagination={{ pageSize: 10 }}
-                                scroll={{ x: true }}
+                                pagination={{ pageSize: 15 }}
+                                scroll={{ x: 700 }}
                             />
-                        )}
-                    </Card>
-                </Col>
-            </Row>
+                        </Card>
+                    </Col>
+                </Row>
+            )}
 
             {/* KPI summary */}
             <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
