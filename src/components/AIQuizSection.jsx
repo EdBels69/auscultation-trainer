@@ -12,6 +12,7 @@ import {
     LockOutlined
 } from '@ant-design/icons';
 import { generateQuizQuestions } from '../services/ai';
+import { supabase } from '../services/supabase';
 import './AIQuizSection.css';
 
 const { Title, Text, Paragraph } = Typography;
@@ -124,7 +125,7 @@ function AIQuizSection({ user, participant }) {
         }
     };
 
-    const finishTest = () => {
+    const finishTest = async () => {
         // Stop audio
         if (audioRef.current) {
             audioRef.current.pause();
@@ -149,15 +150,40 @@ function AIQuizSection({ user, participant }) {
         const unanswered = total - correct - wrong;
         const score = Math.round((correct / total) * 100);
 
-        setResults({
-            total,
-            correct,
-            wrong,
-            unanswered,
-            score,
-            passed: score >= 70
-        });
+        const quizResults = { total, correct, wrong, unanswered, score, passed: score >= 70 };
+        setResults(quizResults);
         setTestCompleted(true);
+
+        // Save quiz results to test_sessions (same table as Test)
+        const canSave = !!(participant || user);
+        if (canSave) {
+            const answersPayload = questions.map((q, i) => {
+                const selectedId = userAnswers[i] ?? null;
+                const correctOpt = q.options.find(opt => opt.isCorrect);
+                const selectedOpt = selectedId ? q.options.find(opt => opt.id === selectedId) : null;
+                return {
+                    question: q.question,
+                    user_answer: selectedOpt?.text || selectedId,
+                    correct_answer: correctOpt?.text || '',
+                    is_correct: selectedId === correctOpt?.id,
+                };
+            });
+
+            const { error } = await supabase.from('test_sessions').insert({
+                user_id: user?.id || null,
+                participant_id: participant?.id || null,
+                session_type: 'quiz',
+                score: quizResults.score,
+                total_q: quizResults.total,
+                correct_q: quizResults.correct,
+                answers: answersPayload,
+                category: category,
+            });
+
+            if (error) {
+                console.error('Error saving quiz session:', error);
+            }
+        }
     };
 
     const toggleAudio = () => {

@@ -123,18 +123,32 @@ function AIChatSection({ user, participant }) {
     const loadLastMistakes = async (id, field) => {
         setLoadingMistakes(true);
         try {
+            // Load last 5 sessions (tests + quizzes) to see error patterns
             const { data } = await supabase
                 .from('test_sessions')
                 .select('score, correct_q, total_q, created_at, answers, session_type, category')
                 .eq(field, id)
                 .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
+                .limit(5);
 
-            if (data && data.answers) {
-                const wrong = (data.answers || []).filter(a => !a.is_correct && a.question);
-                if (wrong.length > 0) {
-                    setLastMistakes({ session: data, wrong });
+            if (data && data.length > 0) {
+                // Aggregate all wrong answers across sessions
+                const allWrong = [];
+                data.forEach(session => {
+                    const wrong = (session.answers || []).filter(a => !a.is_correct && a.question);
+                    wrong.forEach(w => allWrong.push({
+                        ...w,
+                        session_type: session.session_type,
+                        session_date: session.created_at,
+                    }));
+                });
+
+                if (allWrong.length > 0) {
+                    setLastMistakes({
+                        session: data[0], // most recent for display
+                        sessions: data,
+                        wrong: allWrong,
+                    });
                 }
             }
         } catch {
@@ -173,18 +187,37 @@ function AIChatSection({ user, participant }) {
 
     const analyzeMyMistakes = () => {
         if (!lastMistakes) return;
-        const { session, wrong } = lastMistakes;
-        const date = new Date(session.created_at).toLocaleDateString('ru');
-        const type = session.session_type === 'T1' ? 'Т1 (входной)'
-                   : session.session_type === 'T2' ? 'Т2 (+7 дней)'
-                   : session.session_type === 'T3' ? 'Т3 (отсроченный)'
-                   : 'практика';
+        const { sessions, wrong } = lastMistakes;
 
-        const mistakesList = wrong.slice(0, 5).map((m, i) =>
-            `${i + 1}. Вопрос: «${m.question}»\n   Мой ответ: ${m.user_answer || '—'}\n   Правильный ответ: ${m.correct_answer || '—'}`
+        const sessionLabel = (s) => {
+            const type = s === 'T1' ? 'Т1 (входной)' : s === 'T2' ? 'Т2 (+7 дней)'
+                       : s === 'T3' ? 'Т3 (отсроченный)' : s === 'quiz' ? 'ИИ-квиз' : 'тест';
+            return type;
+        };
+
+        // Summary of recent sessions
+        const sessionsSummary = sessions.map(s => {
+            const d = new Date(s.created_at).toLocaleDateString('ru');
+            return `${sessionLabel(s.session_type)} ${d}: ${s.correct_q}/${s.total_q} (${s.score}%)`;
+        }).join('\n');
+
+        // Take up to 8 unique mistakes (deduplicate by question text)
+        const seen = new Set();
+        const uniqueWrong = [];
+        for (const m of wrong) {
+            const key = m.question?.slice(0, 60);
+            if (key && !seen.has(key)) {
+                seen.add(key);
+                uniqueWrong.push(m);
+            }
+            if (uniqueWrong.length >= 8) break;
+        }
+
+        const mistakesList = uniqueWrong.map((m, i) =>
+            `${i + 1}. [${sessionLabel(m.session_type)}] Вопрос: «${m.question}»\n   Мой ответ: ${m.user_answer || '—'}\n   Правильный ответ: ${m.correct_answer || '—'}`
         ).join('\n\n');
 
-        const prompt = `Разбери мои ошибки из теста (${type}, ${date}, результат ${session.correct_q}/${session.total_q}):\n\n${mistakesList}\n\nОбъясни каждую ошибку: чем отличается правильный ответ, механизм звука и как запомнить.`;
+        const prompt = `Разбери мои ошибки из последних тестов и квизов.\n\nИстория сессий:\n${sessionsSummary}\n\nОшибки (${uniqueWrong.length} уникальных):\n\n${mistakesList}\n\nОбъясни каждую ошибку: чем отличается правильный ответ, механизм звука, ключевой аускультативный признак и как запомнить. Если видишь паттерн (например, путаю систолические и диастолические шумы) — укажи.`;
         sendMessage(prompt);
     };
 
@@ -229,9 +262,9 @@ function AIChatSection({ user, participant }) {
                     icon={<WarningOutlined />}
                     message={
                         <span>
-                            Найдены ошибки в последнем тесте ({lastMistakes.wrong.length} шт.,{' '}
-                            {lastMistakes.session.session_type},{' '}
-                            {lastMistakes.session.correct_q}/{lastMistakes.session.total_q})
+                            Найдено {lastMistakes.wrong.length} ошибок в последних{' '}
+                            {lastMistakes.sessions?.length || 1} сессиях (тесты + квизы).{' '}
+                            Последний результат: {lastMistakes.session.correct_q}/{lastMistakes.session.total_q}
                         </span>
                     }
                     action={

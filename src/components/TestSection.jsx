@@ -116,13 +116,18 @@ function TestSection({ audioRecords, user, participant }) {
         const canSave = !!(participant || user);
         if (canSave) {
             const durationSec = startTime ? Math.round((Date.now() - startTime) / 1000) : null;
-            const answersPayload = questions.map((q, i) => ({
-                question: q.question,
-                audio_url: q.audioUrl,
-                user_answer: userAnswers[i] ?? null,
-                correct_answer: q.correctAnswerId,
-                is_correct: userAnswers[i] === q.correctAnswerId,
-            }));
+            const answersPayload = questions.map((q, i) => {
+                const selectedId = userAnswers[i] ?? null;
+                const correctOpt = q.answers.find(a => a.isCorrect);
+                const selectedOpt = selectedId ? q.answers.find(a => a.id === selectedId) : null;
+                return {
+                    question: q.question,
+                    audio_url: q.audioUrl,
+                    user_answer: selectedOpt?.text || selectedId,
+                    correct_answer: correctOpt?.text || q.correctAnswerId,
+                    is_correct: selectedId === q.correctAnswerId,
+                };
+            });
 
             const { error } = await supabase.from('test_sessions').insert({
                 user_id: user?.id || null,
