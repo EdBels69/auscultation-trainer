@@ -6,7 +6,6 @@
 
 export const QUESTION_TYPES = {
     IDENTIFY_SOUND: 'identify_sound',
-    IDENTIFY_POSITION: 'identify_position',
     CLINICAL_SIGNIFICANCE: 'clinical_significance',
     MECHANISM: 'mechanism',
     PHASE_CHARACTERISTICS: 'phase_characteristics',
@@ -166,35 +165,6 @@ function buildIdentifySoundQuestion(correct, wrongRecords, ctx) {
     };
 }
 
-function buildIdentifyPositionQuestion(correct, wrongRecords, ctx) {
-    const question = ctx
-        ? `Пациенту выслушивается «${correct.name}». Укажите оптимальную точку аускультации.`
-        : `Где лучше всего выслушивается «${correct.name}»?`;
-
-    const allAnswers = shuffleArray([
-        { ...correct, _isCorrect: true },
-        ...wrongRecords.map(r => ({ ...r, _isCorrect: false }))
-    ]);
-
-    return {
-        type: QUESTION_TYPES.IDENTIFY_POSITION,
-        question,
-        audioUrl: correct.audioUrl,
-        imageUrl: correct.imageUrl || null,
-        audiogramUrl: correct.audiogramUrl || null,
-        position: correct.position || null,
-        answers: allAnswers.map(r => ({
-            id: r.id,
-            text: r.position || 'Не указана',
-            isCorrect: r._isCorrect
-        })),
-        correctAnswerId: correct.id,
-        explanation: ctx
-            ? `${correct.name} выслушивается: ${ctx.position_desc}. ${ctx.phase}.`
-            : `${correct.name} выслушивается в точке: ${correct.position}`,
-    };
-}
-
 function buildClinicalSignificanceQuestion(correct, wrongRecords, ctx) {
     if (!ctx) return null; // fallback handled in caller
 
@@ -320,7 +290,6 @@ function buildPhaseQuestion(correct, wrongRecords, ctx) {
 
 const QUESTION_BUILDERS = {
     [QUESTION_TYPES.IDENTIFY_SOUND]: buildIdentifySoundQuestion,
-    [QUESTION_TYPES.IDENTIFY_POSITION]: buildIdentifyPositionQuestion,
     [QUESTION_TYPES.CLINICAL_SIGNIFICANCE]: buildClinicalSignificanceQuestion,
     [QUESTION_TYPES.MECHANISM]: buildMechanismQuestion,
     [QUESTION_TYPES.PHASE_CHARACTERISTICS]: buildPhaseQuestion,
@@ -415,15 +384,13 @@ function getWeightedQuestionType(ctx, usedTypes = new Set()) {
     // If clinical context available, weight towards richer types
     const weights = ctx
         ? {
-            [QUESTION_TYPES.IDENTIFY_SOUND]: 25,
-            [QUESTION_TYPES.IDENTIFY_POSITION]: 15,
-            [QUESTION_TYPES.CLINICAL_SIGNIFICANCE]: 25,
-            [QUESTION_TYPES.MECHANISM]: 20,
+            [QUESTION_TYPES.IDENTIFY_SOUND]: 30,
+            [QUESTION_TYPES.CLINICAL_SIGNIFICANCE]: 30,
+            [QUESTION_TYPES.MECHANISM]: 25,
             [QUESTION_TYPES.PHASE_CHARACTERISTICS]: 15,
         }
         : {
-            [QUESTION_TYPES.IDENTIFY_SOUND]: 50,
-            [QUESTION_TYPES.IDENTIFY_POSITION]: 50,
+            [QUESTION_TYPES.IDENTIFY_SOUND]: 100,
             [QUESTION_TYPES.CLINICAL_SIGNIFICANCE]: 0,
             [QUESTION_TYPES.MECHANISM]: 0,
             [QUESTION_TYPES.PHASE_CHARACTERISTICS]: 0,
@@ -466,16 +433,12 @@ function getWrongAnswers(allRecords, correctRecord, count, questionType) {
     const shuffled = shuffleArray(wrong);
 
     const seen = new Set();
-    const correctText = questionType === QUESTION_TYPES.IDENTIFY_POSITION
-        ? correctRecord.position
-        : correctRecord.name;
+    const correctText = correctRecord.name;
     seen.add(correctText);
 
     const result = [];
     for (const record of shuffled) {
-        const text = questionType === QUESTION_TYPES.IDENTIFY_POSITION
-            ? record.position
-            : record.name;
+        const text = record.name;
         if (!text || seen.has(text)) continue;
         seen.add(text);
         result.push(record);
