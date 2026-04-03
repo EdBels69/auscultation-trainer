@@ -125,90 +125,6 @@ const CLINICAL_CONTEXT = {
     },
 };
 
-// ── SVG diagrams of auscultation points ──────────────────────────────
-
-const AUSCULTATION_POINT_IMAGES = {
-    'cardiac': `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 340" font-family="Arial,sans-serif">
-  <rect width="300" height="340" fill="#f8fafc" rx="12"/>
-  <text x="150" y="24" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">Точки аускультации сердца</text>
-  <!-- Chest outline -->
-  <ellipse cx="150" cy="180" rx="100" ry="130" fill="none" stroke="#cbd5e1" stroke-width="1.5"/>
-  <!-- Sternum -->
-  <line x1="150" y1="55" x2="150" y2="260" stroke="#94a3b8" stroke-width="2"/>
-  <!-- Ribs -->
-  <path d="M100,90 Q150,85 200,90" fill="none" stroke="#e2e8f0" stroke-width="1"/>
-  <path d="M90,120 Q150,115 210,120" fill="none" stroke="#e2e8f0" stroke-width="1"/>
-  <path d="M85,150 Q150,145 215,150" fill="none" stroke="#e2e8f0" stroke-width="1"/>
-  <path d="M85,180 Q150,175 215,180" fill="none" stroke="#e2e8f0" stroke-width="1"/>
-  <path d="M90,210 Q150,205 210,210" fill="none" stroke="#e2e8f0" stroke-width="1"/>
-  <!-- Heart silhouette -->
-  <path d="M120,130 Q110,110 130,105 Q150,100 150,120 Q150,100 170,105 Q190,110 180,130 L150,180 Z" fill="#fee2e2" fill-opacity="0.4" stroke="#fca5a5" stroke-width="1"/>
-  <!-- 1. Aortic -->
-  <circle cx="190" cy="90" r="8" fill="#ef4444" opacity="0.85"/>
-  <text x="190" y="94" text-anchor="middle" font-size="11" fill="white" font-weight="bold">А</text>
-  <text x="210" y="83" font-size="9" fill="#dc2626">Аорта</text>
-  <text x="210" y="93" font-size="8" fill="#64748b">II м/р справа</text>
-  <!-- 2. Pulmonary -->
-  <circle cx="110" cy="90" r="8" fill="#3b82f6" opacity="0.85"/>
-  <text x="110" y="94" text-anchor="middle" font-size="11" fill="white" font-weight="bold">Л</text>
-  <text x="53" y="83" font-size="9" fill="#2563eb">Лёг. артерия</text>
-  <text x="53" y="93" font-size="8" fill="#64748b">II м/р слева</text>
-  <!-- 3. Erb -->
-  <circle cx="125" cy="150" r="8" fill="#a855f7" opacity="0.85"/>
-  <text x="125" y="154" text-anchor="middle" font-size="11" fill="white" font-weight="bold">Э</text>
-  <text x="60" y="153" font-size="9" fill="#7c3aed">Боткина–Эрба</text>
-  <text x="60" y="163" font-size="8" fill="#64748b">III м/р слева</text>
-  <!-- 4. Tricuspid -->
-  <circle cx="155" cy="210" r="8" fill="#f59e0b" opacity="0.85"/>
-  <text x="155" y="214" text-anchor="middle" font-size="11" fill="white" font-weight="bold">Т</text>
-  <text x="170" y="210" font-size="9" fill="#d97706">Трикуспид.</text>
-  <text x="170" y="220" font-size="8" fill="#64748b">Основание мечевид.</text>
-  <!-- 5. Mitral -->
-  <circle cx="110" cy="210" r="8" fill="#10b981" opacity="0.85"/>
-  <text x="110" y="214" text-anchor="middle" font-size="11" fill="white" font-weight="bold">М</text>
-  <text x="48" y="213" font-size="9" fill="#059669">Митральный</text>
-  <text x="48" y="223" font-size="8" fill="#64748b">Верхушка</text>
-  <!-- Legend -->
-  <text x="150" y="300" text-anchor="middle" font-size="9" fill="#64748b">А — аортальный, Л — лёг.артерии</text>
-  <text x="150" y="312" text-anchor="middle" font-size="9" fill="#64748b">Э — Боткина–Эрба, Т — трикуспид.</text>
-  <text x="150" y="324" text-anchor="middle" font-size="9" fill="#64748b">М — митральный (верхушка)</text>
-</svg>`)}`,
-
-    'pulmonary': `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 320" font-family="Arial,sans-serif">
-  <rect width="300" height="320" fill="#f8fafc" rx="12"/>
-  <text x="150" y="24" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">Точки аускультации лёгких</text>
-  <!-- Chest outline -->
-  <ellipse cx="150" cy="175" rx="110" ry="130" fill="none" stroke="#cbd5e1" stroke-width="1.5"/>
-  <!-- Sternum -->
-  <line x1="150" y1="50" x2="150" y2="270" stroke="#94a3b8" stroke-width="2"/>
-  <!-- Lungs -->
-  <path d="M65,70 Q60,170 80,260 Q120,270 145,260 L145,70 Z" fill="#dbeafe" fill-opacity="0.35" stroke="#93c5fd" stroke-width="1"/>
-  <path d="M235,70 Q240,170 220,260 Q180,270 155,260 L155,70 Z" fill="#dbeafe" fill-opacity="0.35" stroke="#93c5fd" stroke-width="1"/>
-  <!-- Auscultation points - anterior -->
-  <circle cx="105" cy="85" r="6" fill="#3b82f6" opacity="0.8"/>
-  <circle cx="195" cy="85" r="6" fill="#3b82f6" opacity="0.8"/>
-  <circle cx="95" cy="130" r="6" fill="#3b82f6" opacity="0.8"/>
-  <circle cx="205" cy="130" r="6" fill="#3b82f6" opacity="0.8"/>
-  <circle cx="90" cy="175" r="6" fill="#3b82f6" opacity="0.8"/>
-  <circle cx="210" cy="175" r="6" fill="#3b82f6" opacity="0.8"/>
-  <circle cx="95" cy="220" r="6" fill="#10b981" opacity="0.8"/>
-  <circle cx="205" cy="220" r="6" fill="#10b981" opacity="0.8"/>
-  <!-- Labels -->
-  <text x="150" y="55" text-anchor="middle" font-size="9" fill="#64748b">Передняя поверхность</text>
-  <text x="55" y="88" font-size="8" fill="#1e40af">Верхуш.</text>
-  <text x="220" y="88" font-size="8" fill="#1e40af">Верхуш.</text>
-  <text x="42" y="133" font-size="8" fill="#1e40af">Средн.</text>
-  <text x="222" y="133" font-size="8" fill="#1e40af">Средн.</text>
-  <text x="40" y="178" font-size="8" fill="#1e40af">Нижн.</text>
-  <text x="225" y="178" font-size="8" fill="#1e40af">Нижн.</text>
-  <text x="38" y="223" font-size="8" fill="#047857">Базальн.</text>
-  <text x="223" y="223" font-size="8" fill="#047857">Базальн.</text>
-  <!-- Legend -->
-  <text x="150" y="285" text-anchor="middle" font-size="9" fill="#3b82f6">● Стандартные точки аускультации</text>
-  <text x="150" y="300" text-anchor="middle" font-size="9" fill="#10b981">● Базальные отделы (крепитация, застой)</text>
-</svg>`)}`,
-};
-
 // ── Question templates by type ─────────────────────────────────────────
 
 function getContextForRecord(record) {
@@ -217,14 +133,6 @@ function getContextForRecord(record) {
         if (new RegExp(pattern, 'i').test(name)) return ctx;
     }
     return null;
-}
-
-function getAuscPointImage(record) {
-    if (record.imageUrl) return record.imageUrl;
-    const cat = (record.category || '').toLowerCase();
-    if (cat.includes('cardiac') || cat.includes('кардио')) return AUSCULTATION_POINT_IMAGES.cardiac;
-    if (cat.includes('pulmo') || cat.includes('пульмо')) return AUSCULTATION_POINT_IMAGES.pulmonary;
-    return AUSCULTATION_POINT_IMAGES.cardiac; // default
 }
 
 // ── Question generators per type ───────────────────────────────────────
@@ -247,7 +155,7 @@ function buildIdentifySoundQuestion(correct, wrongRecords, ctx) {
         type: QUESTION_TYPES.IDENTIFY_SOUND,
         question,
         audioUrl: correct.audioUrl,
-        imageUrl: getAuscPointImage(correct),
+        imageUrl: correct.imageUrl || null,
         audiogramUrl: correct.audiogramUrl || null,
         position: correct.position || null,
         answers: allAnswers.map(r => ({ id: r.id, text: r.name, isCorrect: r._isCorrect })),
@@ -272,7 +180,7 @@ function buildIdentifyPositionQuestion(correct, wrongRecords, ctx) {
         type: QUESTION_TYPES.IDENTIFY_POSITION,
         question,
         audioUrl: correct.audioUrl,
-        imageUrl: getAuscPointImage(correct),
+        imageUrl: correct.imageUrl || null,
         audiogramUrl: correct.audiogramUrl || null,
         position: correct.position || null,
         answers: allAnswers.map(r => ({
@@ -315,7 +223,7 @@ function buildClinicalSignificanceQuestion(correct, wrongRecords, ctx) {
         type: QUESTION_TYPES.CLINICAL_SIGNIFICANCE,
         question,
         audioUrl: correct.audioUrl,
-        imageUrl: getAuscPointImage(correct),
+        imageUrl: correct.imageUrl || null,
         audiogramUrl: correct.audiogramUrl || null,
         position: correct.position || null,
         answers: options,
@@ -357,7 +265,7 @@ function buildMechanismQuestion(correct, wrongRecords, ctx) {
         type: QUESTION_TYPES.MECHANISM,
         question,
         audioUrl: correct.audioUrl,
-        imageUrl: getAuscPointImage(correct),
+        imageUrl: correct.imageUrl || null,
         audiogramUrl: correct.audiogramUrl || null,
         position: correct.position || null,
         answers: options,
@@ -399,7 +307,7 @@ function buildPhaseQuestion(correct, wrongRecords, ctx) {
         type: QUESTION_TYPES.PHASE_CHARACTERISTICS,
         question,
         audioUrl: correct.audioUrl,
-        imageUrl: getAuscPointImage(correct),
+        imageUrl: correct.imageUrl || null,
         audiogramUrl: correct.audiogramUrl || null,
         position: correct.position || null,
         answers: options,
