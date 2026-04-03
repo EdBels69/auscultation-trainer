@@ -332,20 +332,13 @@ export function generateTest(audioRecords, numberOfQuestions = 10) {
     const maxQuestions = Math.min(numberOfQuestions, audioRecords.length);
 
     while (questions.length < maxQuestions) {
-        // Prefer variety: pick a type not yet used, then random
-        let type = getWeightedQuestionType(null, usedTypes);
-        const question = generateQuestion(audioRecords, type, usedRecordIds);
+        // Pass null as type — let generateQuestion pick based on record's clinical context
+        const question = generateQuestion(audioRecords, null, usedRecordIds);
 
         if (!question) break;
 
         questions.push(question);
         usedRecordIds.add(question.correctAnswerId);
-        usedTypes.add(question.type);
-
-        // Reset used types once all are covered
-        if (usedTypes.size >= Object.keys(QUESTION_TYPES).length) {
-            usedTypes.clear();
-        }
     }
 
     return questions;
