@@ -16,7 +16,7 @@ import './AIQuizSection.css';
 
 const { Title, Text, Paragraph } = Typography;
 
-function AIQuizSection({ user }) {
+function AIQuizSection({ user, participant }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [testStarted, setTestStarted] = useState(false);
@@ -186,8 +186,8 @@ function AIQuizSection({ user }) {
         setIsPlaying(false);
     };
 
-    // Auth gate — require login
-    if (!user) {
+    // Auth gate — require login (participant OR user)
+    if (!user && !participant) {
         return (
             <div className="ai-quiz-section">
                 <Title level={2}>

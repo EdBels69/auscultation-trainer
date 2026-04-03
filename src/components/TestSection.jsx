@@ -326,7 +326,9 @@ function TestSection({ audioRecords, user, participant }) {
 
                 <Space direction="vertical" size="large" style={{ width: '100%' }}>
                     <div>
-                        <Title level={4}>{currentQuestion?.question}</Title>
+                        <div style={{ whiteSpace: 'pre-line' }}>
+                            <Title level={4} style={{ whiteSpace: 'pre-line' }}>{currentQuestion?.question}</Title>
+                        </div>
 
                         {/* Audio play/stop button */}
                         <Button

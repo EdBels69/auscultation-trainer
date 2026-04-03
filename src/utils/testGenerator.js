@@ -1,74 +1,448 @@
 /**
- * Test question generator
- * Generates random quiz questions from audio records
+ * Test question generator — v2.0
+ * Generates clinical-vignette-style quiz questions from audio records
+ * with varied question types and auscultation-point diagrams
  */
 
 export const QUESTION_TYPES = {
     IDENTIFY_SOUND: 'identify_sound',
-    IDENTIFY_POSITION: 'identify_position'
+    IDENTIFY_POSITION: 'identify_position',
+    CLINICAL_SIGNIFICANCE: 'clinical_significance',
+    MECHANISM: 'mechanism',
+    PHASE_CHARACTERISTICS: 'phase_characteristics',
+};
+
+// ── Clinical context data ──────────────────────────────────────────────
+// Maps sound names (or substrings) to clinical vignettes & meta
+
+const CLINICAL_CONTEXT = {
+    'стеноз аорт': {
+        vignettes: [
+            'Мужчина 72 лет жалуется на одышку при подъёме по лестнице и эпизоды головокружения. При аускультации во 2-м межреберье справа от грудины выслушивается грубый шум.',
+            'Пациент 68 лет, АД 150/60 мм рт. ст. На яремной вырезке пальпируется систолическое дрожание. При аускультации — интенсивный шум с проведением на сонные артерии.',
+        ],
+        mechanism: 'Турбулентный поток крови через суженное устье аорты при систоле',
+        phase: 'Систолический шум изгнания — ромбовидный (crescendo-decrescendo), возникает после I тона',
+        clinical: 'Кальцинирующий аортальный стеноз — самый частый клапанный порок у пожилых',
+        differentials: ['Гипертрофическая кардиомиопатия', 'Функциональный систолический шум'],
+        position_desc: '2-е межреберье справа от грудины (точка аорты)',
+    },
+    'стеноз митрал': {
+        vignettes: [
+            'Женщина 45 лет, ревматический анамнез с детства. Жалобы на одышку, сердцебиение, кровохарканье. На верхушке — хлопающий I тон, тон открытия митрального клапана.',
+            'Пациентка 52 лет с мерцательной аритмией. Facies mitralis. При аускультации на верхушке — диастолический шум с пресистолическим усилением.',
+        ],
+        mechanism: 'Турбулентный поток крови через суженное митральное отверстие из левого предсердия в желудочек в диастолу',
+        phase: 'Диастолический шум — протомезодиастолический с пресистолическим усилением (при синусовом ритме)',
+        clinical: 'Митральный стеноз — чаще всего ревматической этиологии',
+        differentials: ['Шум Остина Флинта при аортальной недостаточности', 'Миксома левого предсердия'],
+        position_desc: 'Верхушка сердца (точка митрального клапана)',
+    },
+    'хлопающий': {
+        vignettes: [
+            'Пациентка 48 лет с ревматическим анамнезом. На верхушке выслушивается необычно громкий, резкий первый тон с «щёлкающим» оттенком.',
+        ],
+        mechanism: 'Ригидные створки митрального клапана при стенозе захлопываются из крайнего положения, создавая резкий звук',
+        phase: 'Усиленный I тон — в начале систолы',
+        clinical: 'Митральный стеноз при сохранённой подвижности створок',
+        differentials: ['Нормальный I тон у астеника', 'Тахикардия с укорочением диастолы'],
+        position_desc: 'Верхушка сердца',
+    },
+    'недостаточность аортал': {
+        vignettes: [
+            'Мужчина 55 лет, АД 180/40 мм рт. ст. «Танец каротид», симптом Мюссе. В точке Боткина–Эрба и во 2-м межреберье справа — мягкий убывающий шум.',
+            'Пациент 60 лет с двойным тоном Траубе на бедренной артерии. На аорте — протодиастолический дующий шум.',
+        ],
+        mechanism: 'Обратный ток крови из аорты в левый желудочек через не полностью сомкнутые полулунные створки в диастолу',
+        phase: 'Диастолический убывающий (decrescendo) шум — начинается сразу после II тона',
+        clinical: 'Аортальная недостаточность — большое пульсовое давление, «периферические» сосудистые признаки',
+        differentials: ['Шум Грехема Стилла при лёгочной гипертензии', 'Диастолический шум митрального стеноза'],
+        position_desc: '3-е межреберье справа или точка Боткина–Эрба',
+    },
+    'недостаточность митрал': {
+        vignettes: [
+            'Мужчина 62 лет, перенёс инфаркт миокарда. На верхушке — дующий шум, проводящийся в левую подмышечную область. Ослабленный I тон.',
+            'Женщина 35 лет с пролапсом МК. На верхушке — поздний систолический шум после среднесистолического клика.',
+        ],
+        mechanism: 'Обратный ток крови из левого желудочка в левое предсердие через несостоятельный митральный клапан в систолу',
+        phase: 'Пансистолический (голосистолический) дующий шум — занимает всю систолу, сливаясь с I и II тоном',
+        clinical: 'Митральная недостаточность — ишемическая, дегенеративная, ревматическая этиология',
+        differentials: ['Дефект межжелудочковой перегородки', 'Трикуспидальная недостаточность'],
+        position_desc: 'Верхушка сердца с проведением в подмышечную область',
+    },
+    'трени.*плевр': {
+        vignettes: [
+            'Пациент 40 лет, боль в грудной клетке при глубоком вдохе. Повышение температуры до 38 °C. При аускультации — шум, синхронный с дыханием, не исчезающий после кашля.',
+            'Женщина 55 лет, жалобы на колющую боль в боку. При надавливании стетоскопом шум усиливается. Шум слышен в обе фазы дыхания.',
+        ],
+        mechanism: 'Трение воспалённых, шероховатых листков висцеральной и париетальной плевры друг о друга',
+        phase: 'Выслушивается в обе фазы дыхания (вдох и выдох), в отличие от хрипов не меняется после кашля',
+        clinical: 'Сухой (фибринозный) плеврит — инфекционный, туберкулёзный, опухолевый',
+        differentials: ['Крепитация', 'Влажные хрипы', 'Шум трения перикарда'],
+        position_desc: 'Над областью поражения (боковая или задняя поверхность грудной клетки)',
+    },
+    'крепитац': {
+        vignettes: [
+            'Пациент 58 лет, прогрессирующая одышка в течение 2 лет. В базальных отделах — мелкие «треск целлофана». Барабанные пальцы.',
+            'Мужчина 70 лет, лихорадка 39 °C, кашель с ржавой мокротой. В нижней доле правого лёгкого — нежная крепитация на вдохе.',
+        ],
+        mechanism: 'Разлипание стенок альвеол на вдохе при наличии в них воспалительного экссудата или фиброза',
+        phase: 'Только на высоте вдоха (конечноинспираторная), в отличие от хрипов — не меняется после кашля',
+        clinical: 'Крупозная пневмония (crepitatio indux/redux), интерстициальные заболевания лёгких (ИЛФ)',
+        differentials: ['Мелкопузырчатые влажные хрипы', 'Шум трения плевры'],
+        position_desc: 'Базальные отделы лёгких',
+    },
+    'ларинготрахеал': {
+        vignettes: [
+            'Студент 22 лет, без жалоб. При аускультации над гортанью и трахеей — громкое дыхание с шумным удлинённым выдохом.',
+        ],
+        mechanism: 'Прохождение воздуха через узкую голосовую щель и трахею с турбулентным потоком',
+        phase: 'Выдох длиннее и громче вдоха — физиологическое бронхиальное (ларинготрахеальное) дыхание',
+        clinical: 'Норма над гортанью и трахеей; патология — если выслушивается над лёгкими (уплотнение, каверна)',
+        differentials: ['Патологическое бронхиальное дыхание', 'Стридор'],
+        position_desc: 'Гортань и трахея',
+    },
+    'полифонич': {
+        vignettes: [
+            'Мужчина 65 лет, курильщик со стажем 40 лет. Бочкообразная грудная клетка. На выдохе — множественные свистящие звуки разной тональности.',
+            'Женщина 30 лет, приступ удушья. ЧДД 28/мин. При аускультации — диффузные свисты и жужжание на выдохе.',
+        ],
+        mechanism: 'Прохождение воздуха через множество суженных бронхов разного калибра создаёт звуки разной частоты',
+        phase: 'Преимущественно на выдохе, при тяжёлой обструкции — в обе фазы',
+        clinical: 'ХОБЛ, бронхиальная астма — признак диффузной бронхообструкции',
+        differentials: ['Монофонический свист (опухоль бронха)', 'Стридор'],
+        position_desc: 'Над всей поверхностью лёгких',
+    },
+    'свистящ': {
+        vignettes: [
+            'Девушка 25 лет, аллергоанамнез. После контакта с кошкой — приступ удушья, экспираторная одышка. При аускультации — высокочастотный свист.',
+        ],
+        mechanism: 'Высокоскоростной поток воздуха через суженные мелкие бронхи (бронхоспазм, отёк слизистой)',
+        phase: 'На выдохе (экспираторные); при тяжёлом бронхоспазме — в обе фазы',
+        clinical: 'Бронхиальная астма, бронхоспазм',
+        differentials: ['Стридор (инспираторный)', 'Сухие басовые хрипы'],
+        position_desc: 'Над всей поверхностью лёгких',
+    },
+};
+
+// ── SVG diagrams of auscultation points ──────────────────────────────
+
+const AUSCULTATION_POINT_IMAGES = {
+    'cardiac': `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 340" font-family="Arial,sans-serif">
+  <rect width="300" height="340" fill="#f8fafc" rx="12"/>
+  <text x="150" y="24" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">Точки аускультации сердца</text>
+  <!-- Chest outline -->
+  <ellipse cx="150" cy="180" rx="100" ry="130" fill="none" stroke="#cbd5e1" stroke-width="1.5"/>
+  <!-- Sternum -->
+  <line x1="150" y1="55" x2="150" y2="260" stroke="#94a3b8" stroke-width="2"/>
+  <!-- Ribs -->
+  <path d="M100,90 Q150,85 200,90" fill="none" stroke="#e2e8f0" stroke-width="1"/>
+  <path d="M90,120 Q150,115 210,120" fill="none" stroke="#e2e8f0" stroke-width="1"/>
+  <path d="M85,150 Q150,145 215,150" fill="none" stroke="#e2e8f0" stroke-width="1"/>
+  <path d="M85,180 Q150,175 215,180" fill="none" stroke="#e2e8f0" stroke-width="1"/>
+  <path d="M90,210 Q150,205 210,210" fill="none" stroke="#e2e8f0" stroke-width="1"/>
+  <!-- Heart silhouette -->
+  <path d="M120,130 Q110,110 130,105 Q150,100 150,120 Q150,100 170,105 Q190,110 180,130 L150,180 Z" fill="#fee2e2" fill-opacity="0.4" stroke="#fca5a5" stroke-width="1"/>
+  <!-- 1. Aortic -->
+  <circle cx="190" cy="90" r="8" fill="#ef4444" opacity="0.85"/>
+  <text x="190" y="94" text-anchor="middle" font-size="11" fill="white" font-weight="bold">А</text>
+  <text x="210" y="83" font-size="9" fill="#dc2626">Аорта</text>
+  <text x="210" y="93" font-size="8" fill="#64748b">II м/р справа</text>
+  <!-- 2. Pulmonary -->
+  <circle cx="110" cy="90" r="8" fill="#3b82f6" opacity="0.85"/>
+  <text x="110" y="94" text-anchor="middle" font-size="11" fill="white" font-weight="bold">Л</text>
+  <text x="53" y="83" font-size="9" fill="#2563eb">Лёг. артерия</text>
+  <text x="53" y="93" font-size="8" fill="#64748b">II м/р слева</text>
+  <!-- 3. Erb -->
+  <circle cx="125" cy="150" r="8" fill="#a855f7" opacity="0.85"/>
+  <text x="125" y="154" text-anchor="middle" font-size="11" fill="white" font-weight="bold">Э</text>
+  <text x="60" y="153" font-size="9" fill="#7c3aed">Боткина–Эрба</text>
+  <text x="60" y="163" font-size="8" fill="#64748b">III м/р слева</text>
+  <!-- 4. Tricuspid -->
+  <circle cx="155" cy="210" r="8" fill="#f59e0b" opacity="0.85"/>
+  <text x="155" y="214" text-anchor="middle" font-size="11" fill="white" font-weight="bold">Т</text>
+  <text x="170" y="210" font-size="9" fill="#d97706">Трикуспид.</text>
+  <text x="170" y="220" font-size="8" fill="#64748b">Основание мечевид.</text>
+  <!-- 5. Mitral -->
+  <circle cx="110" cy="210" r="8" fill="#10b981" opacity="0.85"/>
+  <text x="110" y="214" text-anchor="middle" font-size="11" fill="white" font-weight="bold">М</text>
+  <text x="48" y="213" font-size="9" fill="#059669">Митральный</text>
+  <text x="48" y="223" font-size="8" fill="#64748b">Верхушка</text>
+  <!-- Legend -->
+  <text x="150" y="300" text-anchor="middle" font-size="9" fill="#64748b">А — аортальный, Л — лёг.артерии</text>
+  <text x="150" y="312" text-anchor="middle" font-size="9" fill="#64748b">Э — Боткина–Эрба, Т — трикуспид.</text>
+  <text x="150" y="324" text-anchor="middle" font-size="9" fill="#64748b">М — митральный (верхушка)</text>
+</svg>`)}`,
+
+    'pulmonary': `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 320" font-family="Arial,sans-serif">
+  <rect width="300" height="320" fill="#f8fafc" rx="12"/>
+  <text x="150" y="24" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">Точки аускультации лёгких</text>
+  <!-- Chest outline -->
+  <ellipse cx="150" cy="175" rx="110" ry="130" fill="none" stroke="#cbd5e1" stroke-width="1.5"/>
+  <!-- Sternum -->
+  <line x1="150" y1="50" x2="150" y2="270" stroke="#94a3b8" stroke-width="2"/>
+  <!-- Lungs -->
+  <path d="M65,70 Q60,170 80,260 Q120,270 145,260 L145,70 Z" fill="#dbeafe" fill-opacity="0.35" stroke="#93c5fd" stroke-width="1"/>
+  <path d="M235,70 Q240,170 220,260 Q180,270 155,260 L155,70 Z" fill="#dbeafe" fill-opacity="0.35" stroke="#93c5fd" stroke-width="1"/>
+  <!-- Auscultation points - anterior -->
+  <circle cx="105" cy="85" r="6" fill="#3b82f6" opacity="0.8"/>
+  <circle cx="195" cy="85" r="6" fill="#3b82f6" opacity="0.8"/>
+  <circle cx="95" cy="130" r="6" fill="#3b82f6" opacity="0.8"/>
+  <circle cx="205" cy="130" r="6" fill="#3b82f6" opacity="0.8"/>
+  <circle cx="90" cy="175" r="6" fill="#3b82f6" opacity="0.8"/>
+  <circle cx="210" cy="175" r="6" fill="#3b82f6" opacity="0.8"/>
+  <circle cx="95" cy="220" r="6" fill="#10b981" opacity="0.8"/>
+  <circle cx="205" cy="220" r="6" fill="#10b981" opacity="0.8"/>
+  <!-- Labels -->
+  <text x="150" y="55" text-anchor="middle" font-size="9" fill="#64748b">Передняя поверхность</text>
+  <text x="55" y="88" font-size="8" fill="#1e40af">Верхуш.</text>
+  <text x="220" y="88" font-size="8" fill="#1e40af">Верхуш.</text>
+  <text x="42" y="133" font-size="8" fill="#1e40af">Средн.</text>
+  <text x="222" y="133" font-size="8" fill="#1e40af">Средн.</text>
+  <text x="40" y="178" font-size="8" fill="#1e40af">Нижн.</text>
+  <text x="225" y="178" font-size="8" fill="#1e40af">Нижн.</text>
+  <text x="38" y="223" font-size="8" fill="#047857">Базальн.</text>
+  <text x="223" y="223" font-size="8" fill="#047857">Базальн.</text>
+  <!-- Legend -->
+  <text x="150" y="285" text-anchor="middle" font-size="9" fill="#3b82f6">● Стандартные точки аускультации</text>
+  <text x="150" y="300" text-anchor="middle" font-size="9" fill="#10b981">● Базальные отделы (крепитация, застой)</text>
+</svg>`)}`,
+};
+
+// ── Question templates by type ─────────────────────────────────────────
+
+function getContextForRecord(record) {
+    const name = (record.name || '').toLowerCase();
+    for (const [pattern, ctx] of Object.entries(CLINICAL_CONTEXT)) {
+        if (new RegExp(pattern, 'i').test(name)) return ctx;
+    }
+    return null;
+}
+
+function getAuscPointImage(record) {
+    if (record.imageUrl) return record.imageUrl;
+    const cat = (record.category || '').toLowerCase();
+    if (cat.includes('cardiac') || cat.includes('кардио')) return AUSCULTATION_POINT_IMAGES.cardiac;
+    if (cat.includes('pulmo') || cat.includes('пульмо')) return AUSCULTATION_POINT_IMAGES.pulmonary;
+    return AUSCULTATION_POINT_IMAGES.cardiac; // default
+}
+
+// ── Question generators per type ───────────────────────────────────────
+
+function buildIdentifySoundQuestion(correct, wrongRecords, ctx) {
+    const vignette = ctx?.vignettes
+        ? ctx.vignettes[Math.floor(Math.random() * ctx.vignettes.length)]
+        : null;
+
+    const question = vignette
+        ? `${vignette}\nКакой аускультативный феномен наиболее вероятен?`
+        : pickRandom(SOUND_QUESTIONS_V2);
+
+    const allAnswers = shuffleArray([
+        { ...correct, _isCorrect: true },
+        ...wrongRecords.map(r => ({ ...r, _isCorrect: false }))
+    ]);
+
+    return {
+        type: QUESTION_TYPES.IDENTIFY_SOUND,
+        question,
+        audioUrl: correct.audioUrl,
+        imageUrl: getAuscPointImage(correct),
+        audiogramUrl: correct.audiogramUrl || null,
+        position: correct.position || null,
+        answers: allAnswers.map(r => ({ id: r.id, text: r.name, isCorrect: r._isCorrect })),
+        correctAnswerId: correct.id,
+        explanation: ctx
+            ? `${correct.name}. ${ctx.mechanism}. ${ctx.clinical}.`
+            : correct.description,
+    };
+}
+
+function buildIdentifyPositionQuestion(correct, wrongRecords, ctx) {
+    const question = ctx
+        ? `Пациенту выслушивается «${correct.name}». Укажите оптимальную точку аускультации.`
+        : `Где лучше всего выслушивается «${correct.name}»?`;
+
+    const allAnswers = shuffleArray([
+        { ...correct, _isCorrect: true },
+        ...wrongRecords.map(r => ({ ...r, _isCorrect: false }))
+    ]);
+
+    return {
+        type: QUESTION_TYPES.IDENTIFY_POSITION,
+        question,
+        audioUrl: correct.audioUrl,
+        imageUrl: getAuscPointImage(correct),
+        audiogramUrl: correct.audiogramUrl || null,
+        position: correct.position || null,
+        answers: allAnswers.map(r => ({
+            id: r.id,
+            text: r.position || 'Не указана',
+            isCorrect: r._isCorrect
+        })),
+        correctAnswerId: correct.id,
+        explanation: ctx
+            ? `${correct.name} выслушивается: ${ctx.position_desc}. ${ctx.phase}.`
+            : `${correct.name} выслушивается в точке: ${correct.position}`,
+    };
+}
+
+function buildClinicalSignificanceQuestion(correct, wrongRecords, ctx) {
+    if (!ctx) return null; // fallback handled in caller
+
+    const vignette = ctx.vignettes[Math.floor(Math.random() * ctx.vignettes.length)];
+    const question = `${vignette}\nКакое заболевание наиболее вероятно?`;
+
+    // Build plausible clinical answer options
+    const correctAnswer = ctx.clinical;
+    const distractors = ctx.differentials || [];
+    // Supplement from wrong records
+    const extraDistractors = wrongRecords
+        .map(r => {
+            const rCtx = getContextForRecord(r);
+            return rCtx?.clinical || `Патология: ${r.name}`;
+        })
+        .filter(d => d !== correctAnswer);
+
+    const allDistractors = [...new Set([...distractors, ...extraDistractors])].slice(0, 3);
+
+    const options = shuffleArray([
+        { id: 'correct', text: correctAnswer, isCorrect: true },
+        ...allDistractors.map((d, i) => ({ id: `wrong_${i}`, text: d, isCorrect: false }))
+    ]);
+
+    return {
+        type: QUESTION_TYPES.CLINICAL_SIGNIFICANCE,
+        question,
+        audioUrl: correct.audioUrl,
+        imageUrl: getAuscPointImage(correct),
+        audiogramUrl: correct.audiogramUrl || null,
+        position: correct.position || null,
+        answers: options,
+        correctAnswerId: 'correct',
+        explanation: `${ctx.clinical}. ${ctx.mechanism}.`,
+    };
+}
+
+function buildMechanismQuestion(correct, wrongRecords, ctx) {
+    if (!ctx) return null;
+
+    const question = `Чем обусловлено возникновение феномена «${correct.name}»?`;
+
+    const correctMech = ctx.mechanism;
+    const wrongMechs = wrongRecords
+        .map(r => {
+            const rCtx = getContextForRecord(r);
+            return rCtx?.mechanism;
+        })
+        .filter(Boolean)
+        .filter(m => m !== correctMech);
+
+    const genericMechs = [
+        'Разрыв хорд клапана с пролабированием створки',
+        'Вибрация стенок расширенной полости (аневризма)',
+        'Высокоскоростной ламинарный поток при анемии',
+    ];
+
+    const allDistractors = [...new Set([...wrongMechs, ...genericMechs])]
+        .filter(d => d !== correctMech)
+        .slice(0, 3);
+
+    const options = shuffleArray([
+        { id: 'correct', text: correctMech, isCorrect: true },
+        ...allDistractors.map((d, i) => ({ id: `wrong_${i}`, text: d, isCorrect: false }))
+    ]);
+
+    return {
+        type: QUESTION_TYPES.MECHANISM,
+        question,
+        audioUrl: correct.audioUrl,
+        imageUrl: getAuscPointImage(correct),
+        audiogramUrl: correct.audiogramUrl || null,
+        position: correct.position || null,
+        answers: options,
+        correctAnswerId: 'correct',
+        explanation: `${ctx.mechanism}. ${ctx.phase}.`,
+    };
+}
+
+function buildPhaseQuestion(correct, wrongRecords, ctx) {
+    if (!ctx) return null;
+
+    const question = `Укажите фазовую характеристику звука «${correct.name}»:`;
+
+    const correctPhase = ctx.phase;
+    const wrongPhases = wrongRecords
+        .map(r => {
+            const rCtx = getContextForRecord(r);
+            return rCtx?.phase;
+        })
+        .filter(Boolean)
+        .filter(p => p !== correctPhase);
+
+    const genericPhases = [
+        'Непрерывный шум (систоло-диастолический), не зависит от фазы',
+        'Голосистолический шум — от I до II тона без перерыва',
+        'Пресистолический шум — нарастающий к I тону',
+    ];
+
+    const allDistractors = [...new Set([...wrongPhases, ...genericPhases])]
+        .filter(d => d !== correctPhase)
+        .slice(0, 3);
+
+    const options = shuffleArray([
+        { id: 'correct', text: correctPhase, isCorrect: true },
+        ...allDistractors.map((d, i) => ({ id: `wrong_${i}`, text: d, isCorrect: false }))
+    ]);
+
+    return {
+        type: QUESTION_TYPES.PHASE_CHARACTERISTICS,
+        question,
+        audioUrl: correct.audioUrl,
+        imageUrl: getAuscPointImage(correct),
+        audiogramUrl: correct.audiogramUrl || null,
+        position: correct.position || null,
+        answers: options,
+        correctAnswerId: 'correct',
+        explanation: `${correct.name}: ${ctx.phase}. ${ctx.clinical}.`,
+    };
+}
+
+// ── Main API ───────────────────────────────────────────────────────────
+
+const QUESTION_BUILDERS = {
+    [QUESTION_TYPES.IDENTIFY_SOUND]: buildIdentifySoundQuestion,
+    [QUESTION_TYPES.IDENTIFY_POSITION]: buildIdentifyPositionQuestion,
+    [QUESTION_TYPES.CLINICAL_SIGNIFICANCE]: buildClinicalSignificanceQuestion,
+    [QUESTION_TYPES.MECHANISM]: buildMechanismQuestion,
+    [QUESTION_TYPES.PHASE_CHARACTERISTICS]: buildPhaseQuestion,
 };
 
 /**
  * Generate a random question from audio records
- * @param {Array} audioRecords - available records
- * @param {string|null} type - question type or null for random
- * @param {Set} usedRecordIds - IDs already used as correct answers (to avoid duplication)
  */
 export function generateQuestion(audioRecords, type = null, usedRecordIds = new Set()) {
-    if (!audioRecords || audioRecords.length < 3) {
-        return null;
-    }
+    if (!audioRecords || audioRecords.length < 3) return null;
 
-    // Filter out already-used records for the correct answer
     const availableForCorrect = audioRecords.filter(r => !usedRecordIds.has(r.id));
     if (availableForCorrect.length === 0) return null;
 
-    const questionType = type || getRandomQuestionType();
-    const correctAnswer = getRandomRecord(availableForCorrect);
+    const correctAnswer = pickRandom(availableForCorrect);
+    const ctx = getContextForRecord(correctAnswer);
+    const questionType = type || getWeightedQuestionType(ctx);
+
+    // Get wrong answers
     const wrongAnswers = getWrongAnswers(audioRecords, correctAnswer, 3, questionType);
-    const allAnswers = shuffleArray([
-        { ...correctAnswer, _isCorrect: true },
-        ...wrongAnswers.map(r => ({ ...r, _isCorrect: false }))
-    ]);
 
-    switch (questionType) {
-        case QUESTION_TYPES.IDENTIFY_SOUND:
-            return {
-                type: questionType,
-                question: getRandomSoundQuestion(),
-                audioUrl: correctAnswer.audioUrl,
-                imageUrl: correctAnswer.imageUrl || null,
-                audiogramUrl: correctAnswer.audiogramUrl || null,
-                position: correctAnswer.position || null,
-                answers: allAnswers.map(r => ({
-                    id: r.id,
-                    text: r.name,
-                    isCorrect: r._isCorrect
-                })),
-                correctAnswerId: correctAnswer.id,
-                explanation: correctAnswer.description
-            };
+    // Try the requested builder; fallback to identify_sound if ctx-dependent type can't build
+    const builder = QUESTION_BUILDERS[questionType];
+    let question = builder(correctAnswer, wrongAnswers, ctx);
 
-        case QUESTION_TYPES.IDENTIFY_POSITION:
-            return {
-                type: questionType,
-                question: `Где выслушивается звук "${correctAnswer.name}"?`,
-                audioUrl: correctAnswer.audioUrl,
-                imageUrl: correctAnswer.imageUrl || null,
-                audiogramUrl: correctAnswer.audiogramUrl || null,
-                position: correctAnswer.position || null,
-                answers: allAnswers.map(r => ({
-                    id: r.id,
-                    text: r.position,
-                    isCorrect: r._isCorrect
-                })),
-                correctAnswerId: correctAnswer.id,
-                explanation: `${correctAnswer.name} выслушивается в точке: ${correctAnswer.position}`
-            };
-
-        default:
-            return null;
+    if (!question) {
+        question = buildIdentifySoundQuestion(correctAnswer, wrongAnswers, ctx);
     }
+
+    return question;
 }
 
 /**
@@ -77,18 +451,24 @@ export function generateQuestion(audioRecords, type = null, usedRecordIds = new 
 export function generateTest(audioRecords, numberOfQuestions = 10) {
     const questions = [];
     const usedRecordIds = new Set();
-
-    // Cap to available records (each record used at most once as the correct answer)
+    const usedTypes = new Set();
     const maxQuestions = Math.min(numberOfQuestions, audioRecords.length);
 
     while (questions.length < maxQuestions) {
-        const type = getRandomQuestionType();
+        // Prefer variety: pick a type not yet used, then random
+        let type = getWeightedQuestionType(null, usedTypes);
         const question = generateQuestion(audioRecords, type, usedRecordIds);
 
-        if (!question) break; // no more available records
+        if (!question) break;
 
         questions.push(question);
         usedRecordIds.add(question.correctAnswerId);
+        usedTypes.add(question.type);
+
+        // Reset used types once all are covered
+        if (usedTypes.size >= Object.keys(QUESTION_TYPES).length) {
+            usedTypes.clear();
+        }
     }
 
     return questions;
@@ -104,7 +484,6 @@ export function calculateResults(questions, userAnswers) {
 
     questions.forEach((question, index) => {
         const userAnswer = userAnswers[index];
-
         if (!userAnswer) {
             unanswered++;
         } else if (userAnswer === question.correctAnswerId) {
@@ -117,49 +496,67 @@ export function calculateResults(questions, userAnswers) {
     const total = questions.length;
     const score = Math.round((correct / total) * 100);
 
-    return {
-        total,
-        correct,
-        wrong,
-        unanswered,
-        score,
-        passed: score >= 70
-    };
+    return { total, correct, wrong, unanswered, score, passed: score >= 70 };
 }
 
-// Helper functions
-// 70% IDENTIFY_SOUND, 30% IDENTIFY_POSITION
-function getRandomQuestionType() {
-    return Math.random() < 0.7
-        ? QUESTION_TYPES.IDENTIFY_SOUND
-        : QUESTION_TYPES.IDENTIFY_POSITION;
+// ── Helpers ─────────────────────────────────────────────────────────────
+
+const ALL_TYPES = Object.values(QUESTION_TYPES);
+
+function getWeightedQuestionType(ctx, usedTypes = new Set()) {
+    // If clinical context available, weight towards richer types
+    const weights = ctx
+        ? {
+            [QUESTION_TYPES.IDENTIFY_SOUND]: 25,
+            [QUESTION_TYPES.IDENTIFY_POSITION]: 15,
+            [QUESTION_TYPES.CLINICAL_SIGNIFICANCE]: 25,
+            [QUESTION_TYPES.MECHANISM]: 20,
+            [QUESTION_TYPES.PHASE_CHARACTERISTICS]: 15,
+        }
+        : {
+            [QUESTION_TYPES.IDENTIFY_SOUND]: 50,
+            [QUESTION_TYPES.IDENTIFY_POSITION]: 50,
+            [QUESTION_TYPES.CLINICAL_SIGNIFICANCE]: 0,
+            [QUESTION_TYPES.MECHANISM]: 0,
+            [QUESTION_TYPES.PHASE_CHARACTERISTICS]: 0,
+        };
+
+    // Prefer unused types
+    const available = ALL_TYPES.filter(t => !usedTypes.has(t) && weights[t] > 0);
+    if (available.length > 0) {
+        const totalW = available.reduce((s, t) => s + weights[t], 0);
+        let r = Math.random() * totalW;
+        for (const t of available) {
+            r -= weights[t];
+            if (r <= 0) return t;
+        }
+        return available[available.length - 1];
+    }
+
+    // All used — fully random from non-zero
+    const nonZero = ALL_TYPES.filter(t => weights[t] > 0);
+    return pickRandom(nonZero);
 }
 
-function getRandomRecord(records) {
-    return records[Math.floor(Math.random() * records.length)];
+function pickRandom(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
 }
 
-const SOUND_QUESTIONS = [
-    'Какой аускультативный феномен вы слышите?',
-    'Определите аускультативный феномен:',
-    'Какой звук выслушивается?',
-    'Какой аускультативный феномен наиболее вероятен?',
-    'Что вы слышите при аускультации?',
+const SOUND_QUESTIONS_V2 = [
+    'Прослушайте запись. Какой аускультативный феномен вы определяете?',
+    'Определите аускультативный феномен на записи:',
+    'Прослушайте аудиозапись и выберите наиболее вероятный феномен:',
+    'Какой звук выслушивается в данной записи?',
+    'Какой аускультативный феномен наиболее соответствует записи?',
 ];
 
-function getRandomSoundQuestion() {
-    return SOUND_QUESTIONS[Math.floor(Math.random() * SOUND_QUESTIONS.length)];
-}
-
 /**
- * Get wrong answers, deduplicating by display text to avoid
- * showing the same position/name twice
+ * Get wrong answers, deduplicating by display text
  */
 function getWrongAnswers(allRecords, correctRecord, count, questionType) {
     const wrong = allRecords.filter(r => r.id !== correctRecord.id);
     const shuffled = shuffleArray(wrong);
 
-    // Deduplicate by the text field that will be displayed
     const seen = new Set();
     const correctText = questionType === QUESTION_TYPES.IDENTIFY_POSITION
         ? correctRecord.position
